@@ -49,8 +49,8 @@ export async function initAuthDatabase() {
   `);
 
   const countRow = authDb.prepare('SELECT COUNT(*) as c FROM user').get() as { c: number };
-  if ((countRow?.c ?? 0) === 0) {
-    // Seed default Admin account
+  if ((countRow?.c ?? 0) === 0 && process.env.NODE_ENV !== 'production') {
+    // Seed default dev accounts only outside production
     await auth.api.signUpEmail({
       body: {
         name: 'System Admin',
@@ -60,7 +60,6 @@ export async function initAuthDatabase() {
     });
     authDb.prepare("UPDATE user SET role = 'admin' WHERE email = ?").run('admin@pulselab.io');
 
-    // Seed default FW Engineer account
     await auth.api.signUpEmail({
       body: {
         name: 'FW Engineer',
@@ -70,6 +69,6 @@ export async function initAuthDatabase() {
     });
     authDb.prepare("UPDATE user SET role = 'fw_team' WHERE email = ?").run('fw@pulselab.io');
 
-    console.log('[Auth] Seeded default accounts: admin@pulselab.io (admin) & fw@pulselab.io (fw_team)');
+    console.log('[Auth] Seeded dev accounts: admin@pulselab.io (admin) & fw@pulselab.io (fw_team)');
   }
 }

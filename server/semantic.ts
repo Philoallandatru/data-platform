@@ -86,12 +86,18 @@ function saveActiveIds(ids: Set<string>) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify({ active: Array.from(ids) }, null, 2));
 }
 
+function isTelemetryDbFile(filename: string): boolean {
+  return (
+    filename.endsWith('.db') &&
+    !filename.startsWith('auth') &&
+    !filename.startsWith('personal_datasets')
+  );
+}
+
 export function listDataSources(): DataSourceInfo[] {
   const activeIds = loadActiveIds();
   if (!fs.existsSync(DATA_DIR)) return [];
-  const files = fs
-    .readdirSync(DATA_DIR)
-    .filter((f) => f.endsWith('.db') && !f.startsWith('auth'));
+  const files = fs.readdirSync(DATA_DIR).filter(isTelemetryDbFile);
 
   return files.map((filename) => {
     const id = filename.replace(/\.db$/, '');
@@ -119,7 +125,7 @@ export function setActiveDataSources(ids: string[]) {
   const validFiles = new Set(
     fs
       .readdirSync(DATA_DIR)
-      .filter((f) => f.endsWith('.db') && !f.startsWith('auth'))
+      .filter(isTelemetryDbFile)
       .map((f) => f.replace(/\.db$/, ''))
   );
   const next = new Set(ids.filter((id) => validFiles.has(id)));

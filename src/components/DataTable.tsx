@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
   ArrowLeft,
@@ -65,12 +65,22 @@ export function DataTable<T>({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
 
-  // Column order & visibility state (user-configurable headers)
+  // Column order & visibility state (syncs when column schema changes)
+  const colSchemaKey = initialColumns.map((c) => c.key).join('|');
   const [colOrder, setColOrder] = useState<string[]>(() => initialColumns.map((c) => c.key));
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(
     () => new Set(initialColumns.filter((c) => c.visible === false).map((c) => c.key))
   );
   const [showColMenu, setShowColMenu] = useState(false);
+
+  useEffect(() => {
+    setColOrder(initialColumns.map((c) => c.key));
+    setHiddenCols(new Set(initialColumns.filter((c) => c.visible === false).map((c) => c.key)));
+    setSortKey(null);
+    setSortDir(null);
+    setPage(1);
+    setSelectedIds(new Set());
+  }, [colSchemaKey]);
 
   const orderedColumns = useMemo(() => {
     const map = new Map(initialColumns.map((c) => [c.key, c]));

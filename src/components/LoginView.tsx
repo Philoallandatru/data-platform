@@ -14,8 +14,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
   onToggleTheme,
   onSuccess,
 }) => {
-  const [email, setEmail] = useState('admin@pulselab.io');
-  const [password, setPassword] = useState('Admin@123456');
+  const [email, setEmail] = useState(import.meta.env.DEV ? 'admin@pulselab.io' : '');
+  const [password, setPassword] = useState(import.meta.env.DEV ? 'Admin@123456' : '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,36 +107,38 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </button>
         </form>
 
-        {/* Quick Demo Account Fillers */}
-        <div className="pt-4 border-t border-[var(--border-card)] space-y-2">
-          <div className="text-[11px] font-mono-num text-[var(--text-muted)] uppercase">
-            Quick Demo Accounts (Better Auth + auth.db)
+        {/* Quick Demo Account Fillers (Dev only) */}
+        {import.meta.env.DEV && (
+          <div className="pt-4 border-t border-[var(--border-card)] space-y-2">
+            <div className="text-[11px] font-mono-num text-[var(--text-muted)] uppercase">
+              Quick Demo Accounts (Dev Mode)
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('admin@pulselab.io');
+                  setPassword('Admin@123456');
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--bg-subtle)] hover:bg-[var(--bg-subtle-hover)] border border-[var(--border-card)] text-xs font-medium text-[var(--text-primary)] transition cursor-pointer"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-[#FF6B2C]" />
+                Admin
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('fw@pulselab.io');
+                  setPassword('Engineer@123');
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--bg-subtle)] hover:bg-[var(--bg-subtle-hover)] border border-[var(--border-card)] text-xs font-medium text-[var(--text-primary)] transition cursor-pointer"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-[#00B4D8]" />
+                FW Engineer
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('admin@pulselab.io');
-                setPassword('Admin@123456');
-              }}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--bg-subtle)] hover:bg-[var(--bg-subtle-hover)] border border-[var(--border-card)] text-xs font-medium text-[var(--text-primary)] transition cursor-pointer"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-[#FF6B2C]" />
-              Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('fw@pulselab.io');
-                setPassword('Engineer@123');
-              }}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--bg-subtle)] hover:bg-[var(--bg-subtle-hover)] border border-[var(--border-card)] text-xs font-medium text-[var(--text-primary)] transition cursor-pointer"
-            >
-              <UserCheck className="w-3.5 h-3.5 text-[#00B4D8]" />
-              FW Engineer
-            </button>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

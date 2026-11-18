@@ -224,21 +224,44 @@ app.post('/api/personal-datasets', async (c) => {
   const session = await requireSession(c.req.raw);
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
-  const body = await c.req.json();
-  const name = String(body?.name || 'personal_data.csv').slice(0, 120);
-  const rows = Array.isArray(body?.rows) ? body.rows.slice(0, 5000) : [];
-  const rowsJson = JSON.stringify(rows);
-  if (rowsJson.length > 5 * 1024 * 1024) {
-    return c.json({ error: 'Dataset too large for personal snapshot (max 5MB JSON)' }, 413);
+  const MAX_BYTES = 5 * 1024 * 1024;
+  const contentLength = Number(c.req.header('content-length') || 0);
+  if (contentLength > MAX_BYTES) {
+    return c.json({ error: 'Dataset too large for personal snapshot (max 5MB)' }, 413);
   }
 
-  const now = Date.now();
-  personalDb.prepare('DELETE FROM user_datasets WHERE user_id = ?').run(session.user.id);
-  personalDb
-    .prepare('INSERT INTO user_datasets (user_id, name, row_count, rows_json, updated_at) VALUES (?, ?, ?, ?, ?)')
-    .run(session.user.id, name, rows.length, rowsJson, now);
+  const rawText = await c.req.text();
+  if (Buffer.byteLength(rawText, 'utf8') > MAX_BYTES) {
+    return c.json({ error: 'Dataset too large for personal snapshot (max 5MB)' }, 413);
+  }
 
-  return c.json({ ok: true, name, rowCount: rows.length, updatedAt: now });
+  let body: any;
+  try {
+    body = JSON.parse(rawText);
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const name = String(body?.name || 'personal_data.csv').slice(0, 120);
+  const allRows = Array.isArray(body?.rows) ? body.rows : [];
+  const truncated = allRows.length > 5000;
+  const rows = allRows.slice(0, 5000);
+  const rowsJson = JSON.stringify(rows);
+  const now = Date.now();
+
+  personalDb.exec('BEGIN');
+  try {
+    personalDb.prepare('DELETE FROM user_datasets WHERE user_id = ?').run(session.user.id);
+    personalDb
+      .prepare('INSERT INTO user_datasets (user_id, name, row_count, rows_json, updated_at) VALUES (?, ?, ?, ?, ?)')
+      .run(session.user.id, name, rows.length, rowsJson, now);
+    personalDb.exec('COMMIT');
+  } catch (err: any) {
+    personalDb.exec('ROLLBACK');
+    return c.json({ error: err?.message || 'Failed to save dataset' }, 500);
+  }
+
+  return c.json({ ok: true, name, rowCount: rows.length, truncated, updatedAt: now });
 });
 
 app.delete('/api/personal-datasets', async (c) => {

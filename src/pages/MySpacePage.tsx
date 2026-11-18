@@ -65,15 +65,47 @@ mixed_oltp_70r,4,32,5490,1405440,215,8.6,62.0
 slc_exhaust_steady,128,16,4650,36328,840,9.8,70.5
 zns_append_stream,64,16,9420,147187,195,7.9,58.7`;
 
+/** RFC-4180 compliant CSV parser supporting quoted commas, escaped quotes, and multiline fields */
 function parseCsvText(text: string): Record<string, any>[] {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
-  return lines.slice(1).map((line, idx) => {
-    const vals = line.split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+  const table: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"' && text[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        cell += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      row.push(cell.trim());
+      cell = '';
+    } else if (ch === '\r' || ch === '\n') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell.trim());
+      if (row.some((c) => c !== '')) table.push(row);
+      row = [];
+      cell = '';
+    } else {
+      cell += ch;
+    }
+  }
+  if (cell !== '' || row.length > 0) {
+    row.push(cell.trim());
+    if (row.some((c) => c !== '')) table.push(row);
+  }
+
+  if (table.length < 2) return [];
+  const headers = table[0];
+  return table.slice(1).map((vals, idx) => {
     const obj: Record<string, any> = { __rowId: idx + 1 };
     headers.forEach((h, i) => {
       const raw = vals[i] ?? '';
@@ -99,6 +131,7 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
   onJump,
 }) => {
   const [widgets, setWidgets] = useState<string[]>(['radar', 'scatter', 'semantic_raw']);
+  const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
   const [savingLayout, setSavingLayout] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
@@ -106,20 +139,31 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
   const [importedName, setImportedName] = useState<string | null>(null);
   const [importedRows, setImportedRows] = useState<Record<string, any>[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
   const [xAxis, setXAxis] = useState<string>('');
   const [yAxis, setYAxis] = useState<string>('');
 
-  // Load saved widget preferences & personal dataset from SQLite
+  // Load saved widget preferences & personal dataset from SQLite (abort stale fetches on user switch)
   useEffect(() => {
-    fetch('/api/workspace')
+    const controller = new AbortController();
+    setWorkspaceLoaded(false);
+    setImportedName(null);
+    setImportedRows([]);
+    setImportError(null);
+    setImportNotice(null);
+
+    fetch('/api/workspace', { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((res) => {
         if (Array.isArray(res?.widgets)) setWidgets(res.widgets);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!controller.signal.aborted) setWorkspaceLoaded(true);
+      });
 
-    fetch('/api/personal-datasets')
+    fetch('/api/personal-datasets', { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((res) => {
         if (res?.dataset) {
@@ -128,6 +172,8 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
         }
       })
       .catch(() => {});
+
+    return () => controller.abort();
   }, [userId]);
 
   const toggleWidget = async (id: string) => {
@@ -145,13 +191,14 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
     }
   };
 
-  // Live 1.35M-row Semantic Query for personal widget
+  // Live 1.35M-row Semantic Query for personal widget (scoped to selected model & gated on workspace load)
   const { data: semRaw } = useSemanticQuery(
-    widgets.includes('semantic_raw')
+    workspaceLoaded && widgets.includes('semantic_raw')
       ? {
           dataset: 'raw_io_traces',
           metrics: ['trace_count', 'avg_latency_us', 'avg_power_mw'],
           groupBy: ['firmware'],
+          where: { model: model.id },
           orderBy: { field: 'avg_latency_us', dir: 'asc' },
         }
       : null
@@ -178,21 +225,27 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
   }, [importedHeaders, numericHeaders, xAxis, yAxis]);
 
   const saveImportedData = async (name: string, rows: Record<string, any>[]) => {
-    setImportedName(name);
-    setImportedRows(rows);
     setImportError(null);
+    setImportNotice(null);
+    const limitedRows = rows.slice(0, 5000);
     try {
       const res = await fetch('/api/personal-datasets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, rows: rows.slice(0, 5000) }),
+        body: JSON.stringify({ name, rows: limitedRows }),
       });
+      const json = await res.json();
       if (!res.ok) {
-        const err = await res.json();
-        setImportError(err.error || 'Failed to persist dataset');
+        setImportError(json.error || 'Failed to persist dataset');
+        return;
+      }
+      setImportedName(name);
+      setImportedRows(limitedRows);
+      if (rows.length > 5000) {
+        setImportNotice(`已截断并持久化前 5,000 行（原始文件共 ${rows.length.toLocaleString()} 行）`);
       }
     } catch {
-      setImportError('Failed to save to server');
+      setImportError('Failed to save dataset to server');
     }
   };
 
@@ -248,13 +301,20 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
     [importedHeaders, importedRows]
   );
 
-  // Auto-Chart points
+  // Evenly sample up to 40 points for crisp SVG chart preview
   const chartPoints = useMemo(() => {
     if (!xAxis || !yAxis || importedRows.length === 0) return [];
-    return importedRows.slice(0, 30).map((r, i) => ({
-      label: String(r[xAxis] ?? i + 1),
-      value: Number(r[yAxis]) || 0,
-    }));
+    const maxPts = 40;
+    const step = Math.max(1, Math.ceil(importedRows.length / maxPts));
+    const sampled: { label: string; value: number }[] = [];
+    for (let i = 0; i < importedRows.length && sampled.length < maxPts; i += step) {
+      const r = importedRows[i];
+      sampled.push({
+        label: String(r[xAxis] ?? i + 1),
+        value: Number(r[yAxis]) || 0,
+      });
+    }
+    return sampled;
   }, [importedRows, xAxis, yAxis]);
 
   const maxChartVal = Math.max(1, ...chartPoints.map((p) => p.value));
@@ -379,6 +439,9 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
         {importError && (
           <div className="text-xs text-[#FF4D2E] font-mono-num">{importError}</div>
         )}
+        {importNotice && (
+          <div className="text-xs text-amber-500 font-mono-num">{importNotice}</div>
+        )}
 
         {/* Auto-Generated Chart + DataTable for Imported Data */}
         {importedRows.length > 0 && (
@@ -475,6 +538,7 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
             )}
 
             <DataTable
+              key={importedName || 'empty'}
               title={`Imported Table: ${importedName}`}
               subtitle="自动解析列类型并挂载通用排序、筛选、多选与导出功能"
               data={importedRows}
