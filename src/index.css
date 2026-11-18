@@ -2,9 +2,10 @@
 
 @layer base {
   :root {
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-display: 'Space Grotesk', 'Inter', sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    --font-cjk: 'Noto Sans SC', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+    --font-sans: 'Inter', var(--font-cjk), -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Space Grotesk', 'Inter', var(--font-cjk), sans-serif;
+    --font-mono: 'JetBrains Mono', var(--font-cjk), ui-monospace, SFMono-Regular, monospace;
 
     /* Dark Theme (Default) */
     --bg-page: #05070b;
