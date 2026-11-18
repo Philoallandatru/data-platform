@@ -9,6 +9,7 @@ import {
 import { LazyVisibleCard } from '../components/LazyVisibleCard';
 import { CustomSelect } from '../components/CustomSelect';
 import { ColumnDef, DataTable } from '../components/DataTable';
+import { PanelTabsBar } from '../components/PanelTabsBar';
 import {
   EfficiencyScatterPlot,
   FirmwareRadarChart,
@@ -47,12 +48,36 @@ interface MySpacePageProps {
 }
 
 const WIDGET_CATALOG = [
+  { id: 'personal_import', label: '个人 CSV / JSON 导入与自动图表' },
   { id: 'radar', label: '6-Axis Firmware Radar' },
   { id: 'scatter', label: 'Power vs Throughput Bubble' },
   { id: 'heatmap', label: '6×10 Thermal Heatmap' },
   { id: 'rings', label: 'Composite Score Rings' },
   { id: 'semantic_raw', label: '1.35M-Row Semantic Query' },
   { id: 'alerts', label: 'Automated Alerts Feed' },
+];
+
+interface WorkspacePanel {
+  id: string;
+  title: string;
+  widgets: string[];
+}
+
+interface WorkspacePage {
+  id: string;
+  title: string;
+  panels: WorkspacePanel[];
+}
+
+const DEFAULT_PAGES: WorkspacePage[] = [
+  {
+    id: 'page-1',
+    title: '默认工作台',
+    panels: [
+      { id: 'panel-1', title: '主面板 Panel', widgets: ['radar', 'scatter', 'semantic_raw'] },
+      { id: 'panel-2', title: '个人数据导入', widgets: ['personal_import'] },
+    ],
+  },
 ];
 
 const SAMPLE_CSV = `job_name,block_kb,qd,bw_mbps,iops,lat_p99_us,power_w,temp_c
@@ -130,10 +155,16 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
   alerts,
   onJump,
 }) => {
-  const [widgets, setWidgets] = useState<string[]>(['radar', 'scatter', 'semantic_raw']);
+  const [pages, setPages] = useState<WorkspacePage[]>(DEFAULT_PAGES);
+  const [activePageId, setActivePageId] = useState<string>('page-1');
+  const [activePanelId, setActivePanelId] = useState<string>('panel-1');
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
   const [savingLayout, setSavingLayout] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+
+  const activePage = pages.find((p) => p.id === activePageId) || pages[0];
+  const activePanel = activePage.panels.find((pn) => pn.id === activePanelId) || activePage.panels[0];
+  const widgets = activePanel.widgets;
 
   // Personal imported CSV/JSON dataset (persisted per userId in data/personal_datasets.db)
   const [importedName, setImportedName] = useState<string | null>(null);
@@ -153,10 +184,14 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
     setImportError(null);
     setImportNotice(null);
 
-    fetch('/api/workspace', { signal: controller.signal })
+    fetch('/api/workspace?scope=myspace', { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((res) => {
-        if (Array.isArray(res?.widgets)) setWidgets(res.widgets);
+        if (Array.isArray(res?.pages) && res.pages.length > 0) {
+          setPages(res.pages);
+          setActivePageId(res.pages[0].id);
+          setActivePanelId(res.pages[0].panels[0]?.id || 'panel-1');
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -176,18 +211,105 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
     return () => controller.abort();
   }, [userId]);
 
-  const toggleWidget = async (id: string) => {
-    const next = widgets.includes(id) ? widgets.filter((w) => w !== id) : [...widgets, id];
-    setWidgets(next);
+  const persistPages = async (nextPages: WorkspacePage[]) => {
+    setPages(nextPages);
     setSavingLayout(true);
     try {
       await fetch('/api/workspace', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ widgets: next }),
+        body: JSON.stringify({ scope: 'myspace', pages: nextPages }),
       });
     } finally {
       setSavingLayout(false);
+    }
+  };
+
+  const toggleWidget = (id: string) => {
+    const nextWidgets = widgets.includes(id)
+      ? widgets.filter((w) => w !== id)
+      : [...widgets, id];
+    const nextPages = pages.map((p) =>
+      p.id !== activePage.id
+        ? p
+        : {
+            ...p,
+            panels: p.panels.map((pn) =>
+              pn.id !== activePanel.id ? pn : { ...pn, widgets: nextWidgets }
+            ),
+          }
+    );
+    persistPages(nextPages);
+  };
+
+  const addPage = () => {
+    const newId = `page-${Date.now().toString(36)}`;
+    const newPanelId = `panel-${Date.now().toString(36)}`;
+    const nextPages: WorkspacePage[] = [
+      ...pages,
+      {
+        id: newId,
+        title: `页面 ${pages.length + 1}`,
+        panels: [{ id: newPanelId, title: 'Panel 1', widgets: ['radar', 'personal_import'] }],
+      },
+    ];
+    persistPages(nextPages);
+    setActivePageId(newId);
+    setActivePanelId(newPanelId);
+  };
+
+  const renamePage = (id: string, title: string) => {
+    persistPages(pages.map((p) => (p.id === id ? { ...p, title } : p)));
+  };
+
+  const deletePage = (id: string) => {
+    if (pages.length <= 1) return;
+    const next = pages.filter((p) => p.id !== id);
+    persistPages(next);
+    if (activePageId === id) {
+      setActivePageId(next[0].id);
+      setActivePanelId(next[0].panels[0].id);
+    }
+  };
+
+  const addPanel = () => {
+    const newPanelId = `panel-${Date.now().toString(36)}`;
+    const nextPages = pages.map((p) =>
+      p.id !== activePage.id
+        ? p
+        : {
+            ...p,
+            panels: [
+              ...p.panels,
+              { id: newPanelId, title: `Panel ${p.panels.length + 1}`, widgets: ['scatter'] },
+            ],
+          }
+    );
+    persistPages(nextPages);
+    setActivePanelId(newPanelId);
+  };
+
+  const renamePanel = (panelId: string, title: string) => {
+    const nextPages = pages.map((p) =>
+      p.id !== activePage.id
+        ? p
+        : {
+            ...p,
+            panels: p.panels.map((pn) => (pn.id === panelId ? { ...pn, title } : pn)),
+          }
+    );
+    persistPages(nextPages);
+  };
+
+  const deletePanel = (panelId: string) => {
+    if (activePage.panels.length <= 1) return;
+    const nextPanels = activePage.panels.filter((pn) => pn.id !== panelId);
+    const nextPages = pages.map((p) =>
+      p.id !== activePage.id ? p : { ...p, panels: nextPanels }
+    );
+    persistPages(nextPages);
+    if (activePanelId === panelId) {
+      setActivePanelId(nextPanels[0].id);
     }
   };
 
@@ -350,8 +472,43 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
           className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[var(--bg-subtle)] hover:bg-[var(--bg-subtle-hover)] border border-[var(--border-subtle)] text-xs font-semibold text-[var(--text-primary)] transition cursor-pointer"
         >
           <SlidersHorizontal className="w-3.5 h-3.5 text-[#FF6B2C]" />
-          定制我的卡片 ({widgets.length})
+          定制当前 Panel 组件 ({widgets.length})
         </button>
+      </div>
+
+      {/* Multi-Page & Multi-Panel Switcher */}
+      <div className="bento-card rounded-2xl p-4 space-y-3">
+        <PanelTabsBar
+          label="Pages"
+          items={pages.map((p) => ({ id: p.id, title: p.title }))}
+          activeId={activePage.id}
+          onSelect={(id) => {
+            setActivePageId(id);
+            const target = pages.find((p) => p.id === id);
+            if (target?.panels[0]) setActivePanelId(target.panels[0].id);
+          }}
+          onAdd={addPage}
+          onRename={renamePage}
+          onDelete={deletePage}
+          addLabel="新建页面"
+          maxItems={10}
+          accentColor="#FF6B2C"
+        />
+
+        <div className="pt-2.5 border-t border-[var(--border-card)]">
+          <PanelTabsBar
+            label="Panels"
+            items={activePage.panels.map((pn) => ({ id: pn.id, title: pn.title }))}
+            activeId={activePanel.id}
+            onSelect={setActivePanelId}
+            onAdd={addPanel}
+            onRename={renamePanel}
+            onDelete={deletePanel}
+            addLabel="新建 Panel"
+            maxItems={6}
+            accentColor="#00B4D8"
+          />
+        </div>
       </div>
 
       {/* Widget Picker Drawer */}
@@ -383,7 +540,8 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
         </div>
       )}
 
-      {/* Personal CSV / JSON Dropzone & Auto-Visualizer */}
+      {/* Personal CSV / JSON Dropzone & Auto-Visualizer (when enabled on active panel) */}
+      {widgets.includes('personal_import') && (
       <div className="bento-card rounded-2xl p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -550,6 +708,7 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
           </div>
         )}
       </div>
+      )}
 
       {/* Pinned Main-DB Widgets (Lazy-Mounted via IntersectionObserver) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">

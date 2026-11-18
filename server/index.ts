@@ -158,27 +158,74 @@ app.post('/api/admin/datasources', async (c) => {
   return c.json({ datasources: setActiveDataSources(activeIds) });
 });
 
-// 8. Personal Workspace Layout Persistence (per authenticated user in auth.db)
+// 8. Multi-Page & Panel Workspace Persistence (supports My Space + per-page Panel scopes in auth.db)
+interface WorkspacePanel {
+  id: string;
+  title: string;
+  widgets: string[];
+}
+interface WorkspacePage {
+  id: string;
+  title: string;
+  panels: WorkspacePanel[];
+}
+
 const DEFAULT_WIDGETS = ['radar', 'scatter', 'semantic_raw'];
+const makeDefaultPages = (widgets: string[] = DEFAULT_WIDGETS): WorkspacePage[] => [
+  {
+    id: 'page-1',
+    title: '默认工作台',
+    panels: [
+      { id: 'panel-1', title: '主面板 Panel', widgets },
+      { id: 'panel-2', title: '个人数据导入', widgets: ['personal_import'] },
+    ],
+  },
+];
+
+function sanitizePages(raw: any): WorkspacePage[] {
+  if (!Array.isArray(raw) || raw.length === 0) return makeDefaultPages();
+  return raw.slice(0, 10).map((p: any, pi: number) => ({
+    id: String(p?.id || `page-${pi + 1}`).slice(0, 40),
+    title: String(p?.title || `Page ${pi + 1}`).slice(0, 40),
+    panels:
+      Array.isArray(p?.panels) && p.panels.length > 0
+        ? p.panels.slice(0, 6).map((pn: any, pni: number) => ({
+            id: String(pn?.id || `panel-${pni + 1}`).slice(0, 40),
+            title: String(pn?.title || `Panel ${pni + 1}`).slice(0, 40),
+            widgets: Array.isArray(pn?.widgets)
+              ? pn.widgets.filter((w: any) => typeof w === 'string').slice(0, 12)
+              : [],
+          }))
+        : [{ id: 'panel-1', title: 'Panel 1', widgets: [] }],
+  }));
+}
 
 app.get('/api/workspace', async (c) => {
   const session = await requireSession(c.req.raw);
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
+  const scope = (c.req.query('scope') || 'myspace').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+  const key = scope === 'myspace' ? session.user.id : `${session.user.id}:${scope}`;
+
   const row = authDb
     .prepare('SELECT widgets_json, updated_at FROM user_workspaces WHERE user_id = ?')
-    .get(session.user.id) as { widgets_json: string; updated_at: number } | undefined;
+    .get(key) as { widgets_json: string; updated_at: number } | undefined;
 
-  let widgets = DEFAULT_WIDGETS;
+  let pages = makeDefaultPages(scope === 'myspace' ? DEFAULT_WIDGETS : ['placeholder']);
   if (row?.widgets_json) {
     try {
       const parsed = JSON.parse(row.widgets_json);
-      if (Array.isArray(parsed)) widgets = parsed;
+      if (Array.isArray(parsed)) {
+        // Backward-compatible migration from flat widget[]
+        pages = makeDefaultPages(parsed);
+      } else if (Array.isArray(parsed?.pages)) {
+        pages = sanitizePages(parsed.pages);
+      }
     } catch {
-      widgets = DEFAULT_WIDGETS;
+      // keep default
     }
   }
-  return c.json({ widgets, updatedAt: row?.updated_at ?? null });
+  return c.json({ pages, updatedAt: row?.updated_at ?? null });
 });
 
 app.put('/api/workspace', async (c) => {
@@ -186,7 +233,13 @@ app.put('/api/workspace', async (c) => {
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
   const body = await c.req.json();
-  const widgets = Array.isArray(body?.widgets) ? body.widgets.slice(0, 20) : DEFAULT_WIDGETS;
+  const scope = String(body?.scope || 'myspace').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
+  const key = scope === 'myspace' ? session.user.id : `${session.user.id}:${scope}`;
+
+  const pages = Array.isArray(body?.pages)
+    ? sanitizePages(body.pages)
+    : makeDefaultPages(Array.isArray(body?.widgets) ? body.widgets.slice(0, 12) : DEFAULT_WIDGETS);
+
   const now = Date.now();
   authDb
     .prepare(
@@ -194,9 +247,9 @@ app.put('/api/workspace', async (c) => {
        VALUES (?, ?, ?)
        ON CONFLICT(user_id) DO UPDATE SET widgets_json = excluded.widgets_json, updated_at = excluded.updated_at`
     )
-    .run(session.user.id, JSON.stringify(widgets), now);
+    .run(key, JSON.stringify({ pages }), now);
 
-  return c.json({ ok: true, widgets, updatedAt: now });
+  return c.json({ ok: true, pages, updatedAt: now });
 });
 
 // 9. Personal Imported Datasets Persistence (isolated in data/personal_datasets.db)
