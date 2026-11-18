@@ -16,6 +16,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Shield,
   Zap,
 } from 'lucide-react';
 
@@ -26,6 +27,7 @@ interface SidebarProps {
   activeModule: ModuleKey;
   activeSubPageId: string;
   onNavigate: (module: ModuleKey, subPageId: string, defaultTestId?: string) => void;
+  userRole?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -35,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeModule,
   activeSubPageId,
   onNavigate,
+  userRole = 'viewer',
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [openPerf, setOpenPerf] = useState(true);
@@ -203,7 +206,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {openCustom && (
               <div className="mt-1 ml-3 pl-3 border-l border-[var(--border-card)] space-y-1">
-                {CUSTOM_PAGES.map((cp) => {
+                {CUSTOM_PAGES.filter((cp) => {
+                  if (userRole === 'admin') return true;
+                  if (userRole === 'fw_team') return cp.id === 'custom-fw' || cp.id === 'custom-sandbox';
+                  if (userRole === 'qa_team') return cp.id === 'custom-qa' || cp.id === 'custom-sandbox';
+                  return cp.id === 'custom-exec';
+                }).map((cp) => {
                   const isActive = activeModule === 'custom' && activeSubPageId === cp.id;
                   return (
                     <button
@@ -227,8 +235,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* 4. All-in-One Visualization Showcase */}
-        <div className="pt-2 border-t border-[var(--border-card)]">
+        {/* 4. All-in-One Visualization Showcase & Admin Console */}
+        <div className="pt-2 border-t border-[var(--border-card)] space-y-2">
           <button
             onClick={() => onNavigate('showcase', 'gallery')}
             className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer border ${
@@ -240,6 +248,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <LayoutGrid className="w-4 h-4 text-[#FF6B2C] shrink-0" />
             {!collapsed && <span>可视化样板库 (Viz Gallery)</span>}
           </button>
+
+          {userRole === 'admin' && (
+            <button
+              onClick={() => onNavigate('admin', 'console')}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer border ${
+                activeModule === 'admin'
+                  ? 'bg-[#FF6B2C]/15 border-[#FF6B2C]/50 text-[#FF6B2C]'
+                  : 'bg-[var(--bg-subtle)] border-[var(--border-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <Shield className="w-4 h-4 text-[#FF6B2C] shrink-0" />
+              {!collapsed && <span>系统管理 (Admin)</span>}
+            </button>
+          )}
         </div>
       </div>
 

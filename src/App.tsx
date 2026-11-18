@@ -9,6 +9,8 @@ import {
 import { Sidebar } from './components/Sidebar';
 import { CustomSelect } from './components/CustomSelect';
 import { TelemetryExplorer } from './components/TelemetryExplorer';
+import { LoginView } from './components/LoginView';
+import { signOut, useSession } from './lib/authClient';
 
 const PerformanceSuitePage = lazy(() =>
   import('./pages/PerformanceSuitePage').then((m) => ({ default: m.PerformanceSuitePage }))
@@ -22,12 +24,16 @@ const VizGalleryPage = lazy(() =>
 const CustomBlankPage = lazy(() =>
   import('./pages/CustomBlankPage').then((m) => ({ default: m.CustomBlankPage }))
 );
+const AdminPage = lazy(() =>
+  import('./pages/AdminPage').then((m) => ({ default: m.AdminPage }))
+);
 import {
   Activity,
   ChevronRight,
   Cpu,
   Database,
   HardDrive,
+  LogOut,
   Menu,
   Moon,
   Sun,
@@ -35,6 +41,7 @@ import {
 } from 'lucide-react';
 
 export function App() {
+  const { data: session, isPending: sessionPending, refetch: refetchSession } = useSession();
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem('pulse-radar-theme');
     return saved === 'light' ? 'light' : 'dark';
@@ -72,6 +79,7 @@ export function App() {
       })
       .then((payload: SSDTelemetryPayload) => {
         setData(payload);
+        setError(null);
         if (isInitial) {
           if (payload.models.length > 0) setSelectedModelId(payload.models[0].id);
           if (payload.firmwares.length > 0) setSelectedFirmwareId(payload.firmwares[payload.firmwares.length - 1].id);
@@ -82,11 +90,14 @@ export function App() {
   };
 
   useEffect(() => {
-    fetchTelemetry(true);
-  }, []);
+    if (session?.user) {
+      fetchTelemetry(true);
+    }
+  }, [session?.user?.id]);
 
-  // Poll SQLite PRAGMA data_version every 5s to auto-sync external MCP writes
+  // Poll SQLite PRAGMA data_version every 5s when authenticated
   useEffect(() => {
+    if (!session?.user) return;
     const timer = setInterval(() => {
       fetch('/api/ssd-version')
         .then((r) => (r.ok ? r.json() : null))
@@ -102,7 +113,7 @@ export function App() {
         .catch(() => {});
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [session?.user?.id]);
 
   const currentModel = useMemo(
     () => data?.models.find((m) => m.id === selectedModelId) || data?.models[0],
@@ -180,12 +191,35 @@ export function App() {
     return POWER_SUITES.find((s) => s.id === activeSubPageId) || POWER_SUITES[0];
   }, [activeModule, activeSubPageId]);
 
+  if (sessionPending) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex items-center justify-center">
+        <div className="flex items-center gap-3 text-sm font-mono-num">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#FF6B2C] animate-ping" />
+          Checking session...
+        </div>
+      </div>
+    );
+  }
+
+  if (!session?.user) {
+    return (
+      <LoginView
+        theme={theme}
+        onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+        onSuccess={() => refetchSession()}
+      />
+    );
+  }
+
+  const userRole = (session.user as any).role || 'viewer';
+
   if (error) {
     return (
       <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex items-center justify-center p-6">
         <div className="bento-card rounded-2xl p-6 max-w-md text-center">
           <Database className="w-8 h-8 text-[#FF4D2E] mx-auto mb-3" />
-          <h2 className="font-display text-lg font-bold">SQLite Connection Error</h2>
+          <h2 className="font-display text-lg font-bold">API Connection Error</h2>
           <p className="text-xs text-[var(--text-secondary)] mt-2">{error}</p>
         </div>
       </div>
@@ -211,7 +245,6 @@ export function App() {
         style={{ backgroundColor: 'var(--bg-header)' }}
       >
         <div className="px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          {/* Left: Mobile Drawer Toggle + Brand + Breadcrumb */}
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setMobileMenuOpen((v) => !v)}
@@ -247,9 +280,11 @@ export function App() {
                     ? 'Viz Gallery'
                     : activeModule === 'custom'
                     ? 'Custom'
+                    : activeModule === 'admin'
+                    ? 'Admin'
                     : activeModule}
                 </span>
-                {activeModule !== 'showcase' && (
+                {activeModule !== 'showcase' && activeModule !== 'admin' && (
                   <>
                     <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
                     <span className="text-[#FF6B2C] font-medium">
@@ -261,7 +296,6 @@ export function App() {
             </div>
           </div>
 
-          {/* Right: Custom Glassmorphic Firmware & Workload Selectors + Theme Toggle */}
           <div className="flex items-center gap-2 shrink-0">
             <CustomSelect
               value={selectedFirmwareId}
@@ -296,6 +330,25 @@ export function App() {
               }))}
             />
 
+            {/* User Badge & Sign Out */}
+            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-[var(--border-card)]">
+              <div className="text-right">
+                <div className="text-xs font-semibold text-[var(--text-primary)] leading-tight">
+                  {session.user.name}
+                </div>
+                <div className="text-[10px] font-mono-num text-[#FF6B2C] uppercase">
+                  {userRole}
+                </div>
+              </div>
+              <button
+                onClick={() => signOut()}
+                title="Sign Out"
+                className="p-2 rounded-xl bg-[var(--bg-input)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[#FF4D2E] transition cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
             <button
               onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
               aria-label="Toggle theme"
@@ -308,9 +361,8 @@ export function App() {
         </div>
       </header>
 
-      {/* Main Layout: Left Sidebar + Right Page Workspace */}
+      {/* Main Layout */}
       <div className="flex flex-1 min-h-0 relative">
-        {/* Desktop Sidebar */}
         <div className="hidden lg:flex">
           <Sidebar
             models={data.models}
@@ -319,10 +371,10 @@ export function App() {
             activeModule={activeModule}
             activeSubPageId={activeSubPageId}
             onNavigate={handleNavigate}
+            userRole={userRole}
           />
         </div>
 
-        {/* Mobile Drawer Sidebar */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 lg:hidden flex">
             <div className="h-full flex">
@@ -333,6 +385,7 @@ export function App() {
                 activeModule={activeModule}
                 activeSubPageId={activeSubPageId}
                 onNavigate={handleNavigate}
+                userRole={userRole}
               />
             </div>
             <div
@@ -342,17 +395,18 @@ export function App() {
           </div>
         )}
 
-        {/* Active Page Content */}
         <main className="flex-1 min-w-0 p-4 sm:p-6 space-y-5 overflow-y-auto">
-          <TelemetryExplorer
-            runs={data.runs}
-            firmwares={data.firmwares}
-            testItems={data.testItems}
-            selectedModelId={selectedModelId}
-            selectedTestId={selectedTestId}
-            onJump={handleJump}
-            totalRows={totalRows}
-          />
+          {activeModule !== 'admin' && (
+            <TelemetryExplorer
+              runs={data.runs}
+              firmwares={data.firmwares}
+              testItems={data.testItems}
+              selectedModelId={selectedModelId}
+              selectedTestId={selectedTestId}
+              onJump={handleJump}
+              totalRows={totalRows}
+            />
+          )}
 
           <Suspense
             fallback={
@@ -426,6 +480,8 @@ export function App() {
                 firmwareVersion={currentFirmware.version}
               />
             )}
+
+            {activeModule === 'admin' && userRole === 'admin' && <AdminPage />}
           </Suspense>
         </main>
       </div>

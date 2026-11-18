@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CustomPageConfig } from '../config/navigation';
 import { PlaceholderSlot } from '../components/PlaceholderSlot';
-import { FilePlus2, Sparkles } from 'lucide-react';
+import { useSemanticQuery } from '../hooks/useSemanticQuery';
+import { Database, FilePlus2, Sparkles } from 'lucide-react';
 
 interface CustomBlankPageProps {
   page: CustomPageConfig;
@@ -14,6 +15,22 @@ export const CustomBlankPage: React.FC<CustomBlankPageProps> = ({
   modelName,
   firmwareVersion,
 }) => {
+  const [targetDataset, setTargetDataset] = useState<'ssd_runs' | 'raw_io_traces'>('ssd_runs');
+  const { data: semData, loading: semLoading, error: semError } = useSemanticQuery(
+    targetDataset === 'ssd_runs'
+      ? {
+          dataset: 'ssd_runs',
+          metrics: ['avg_bandwidth', 'avg_power', 'efficiency'],
+          groupBy: ['firmware'],
+          orderBy: { field: 'avg_bandwidth', dir: 'desc' },
+        }
+      : {
+          dataset: 'raw_io_traces',
+          metrics: ['trace_count', 'avg_latency_us', 'avg_power_mw'],
+          groupBy: ['firmware'],
+          orderBy: { field: 'avg_latency_us', dir: 'asc' },
+        }
+  );
   return (
     <div className="space-y-5">
       {/* Blank Workspace Header */}
@@ -42,6 +59,64 @@ export const CustomBlankPage: React.FC<CustomBlankPageProps> = ({
           <Sparkles className="w-3.5 h-3.5 text-[#00B4D8]" />
           Context: {modelName} • {firmwareVersion}
         </div>
+      </div>
+
+      {/* Live Semantic Layer SDK Demo (Multi-DB Pool) */}
+      <div className="bento-card rounded-2xl p-5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-[#00B4D8]" />
+            <h3 className="font-display text-sm font-semibold text-[var(--text-primary)]">
+              Semantic Layer SDK Demo (<code className="text-[#FF6B2C]">useSemanticQuery</code>)
+            </h3>
+          </div>
+          <div className="flex items-center gap-1.5 bg-[var(--bg-subtle)] p-0.5 rounded-lg border border-[var(--border-card)] text-[11px] font-mono-num">
+            <button
+              onClick={() => setTargetDataset('ssd_runs')}
+              className={`px-2.5 py-1 rounded-md cursor-pointer transition ${
+                targetDataset === 'ssd_runs' ? 'bg-[#00B4D8] text-white font-semibold' : 'text-[var(--text-secondary)]'
+              }`}
+            >
+              ssd_benchmark.db (ssd_runs)
+            </button>
+            <button
+              onClick={() => setTargetDataset('raw_io_traces')}
+              className={`px-2.5 py-1 rounded-md cursor-pointer transition ${
+                targetDataset === 'raw_io_traces' ? 'bg-[#A855F7] text-white font-semibold' : 'text-[var(--text-secondary)]'
+              }`}
+            >
+              ssd_150mb_sim.db (1.35M rows)
+            </button>
+          </div>
+        </div>
+
+        {semError ? (
+          <div className="text-xs text-[#FF4D2E] font-mono-num">{semError}</div>
+        ) : semLoading || !semData ? (
+          <div className="text-xs text-[var(--text-muted)] font-mono-num">Querying semantic layer...</div>
+        ) : (
+          <div className="space-y-2">
+            <div className="text-[11px] font-mono-num text-[var(--text-secondary)]">
+              Datasource: <strong className="text-[#00B4D8]">{semData.datasource}.db</strong> •{' '}
+              {semData.rowCount} grouped rows in <strong className="text-emerald-500">{semData.elapsedMs} ms</strong>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              {semData.rows.map((r, i) => (
+                <div key={i} className="p-2.5 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-card)] text-xs font-mono-num">
+                  <div className="font-bold text-[var(--text-primary)]">{r.firmware}</div>
+                  {Object.entries(r)
+                    .filter(([k]) => k !== 'firmware')
+                    .map(([k, v]) => (
+                      <div key={k} className="text-[10px] text-[var(--text-secondary)] flex justify-between mt-0.5">
+                        <span>{k}:</span>
+                        <span className="text-[#00B4D8] font-semibold">{String(v)}</span>
+                      </div>
+                    ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Blank Grid Canvas with Extensible Slots */}
