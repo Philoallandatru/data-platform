@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Space Grotesk', 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+    /* Dark Theme (Default) */
+    --bg-page: #05070b;
+    --bg-header: rgba(5, 7, 11, 0.82);
+    --bg-ticker: rgba(8, 11, 18, 0.9);
+    --bg-card-start: rgba(16, 21, 31, 0.88);
+    --bg-card-end: rgba(9, 12, 18, 0.94);
+    --bg-subtle: rgba(255, 255, 255, 0.04);
+    --bg-subtle-hover: rgba(255, 255, 255, 0.08);
+    --bg-input: #0c111b;
+    --bg-tooltip: rgba(9, 13, 20, 0.94);
+    --border-card: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.1);
+    --text-primary: #e6edf3;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --grid-line: rgba(255, 255, 255, 0.025);
+    --chart-grid: rgba(255, 255, 255, 0.06);
+    --card-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  }
+
+  html.light {
+    --bg-page: #f4f7fb;
+    --bg-header: rgba(255, 255, 255, 0.85);
+    --bg-ticker: rgba(241, 245, 249, 0.95);
+    --bg-card-start: rgba(255, 255, 255, 0.96);
+    --bg-card-end: rgba(248, 250, 252, 0.98);
+    --bg-subtle: rgba(15, 23, 42, 0.04);
+    --bg-subtle-hover: rgba(15, 23, 42, 0.08);
+    --bg-input: #ffffff;
+    --bg-tooltip: rgba(255, 255, 255, 0.96);
+    --border-card: rgba(15, 23, 42, 0.09);
+    --border-subtle: rgba(15, 23, 42, 0.12);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --grid-line: rgba(15, 23, 42, 0.035);
+    --chart-grid: rgba(15, 23, 42, 0.08);
+    --card-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    overflow-x: hidden;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.bg-cyber-grid {
+  background-size: 40px 40px;
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+}
+
+.bento-card {
+  background: linear-gradient(165deg, var(--bg-card-start) 0%, var(--bg-card-end) 100%);
+  border: 1px solid var(--border-card);
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(18px);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.bento-card:hover {
+  border-color: rgba(255, 107, 44, 0.35);
+  box-shadow: var(--card-shadow), 0 0 24px -8px rgba(255, 107, 44, 0.14);
+}
+
+@keyframes ticker-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker {
+  display: flex;
+  width: max-content;
+  animation: ticker-scroll 42s linear infinite;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-page);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.35);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 107, 44, 0.55);
+}

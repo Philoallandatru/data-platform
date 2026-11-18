@@ -1,0 +1,16 @@
+# Dependencies & Build
+node_modules/
+dist/
+*.local
+
+# Large simulated SQLite DB (>100MB GitHub limit) & WAL files
+data/ssd_150mb_sim.db*
+*.db-wal
+*.db-shm
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.*
