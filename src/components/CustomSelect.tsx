@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Search } from 'lucide-react';
 
@@ -44,7 +44,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
 
   const selected = options.find((o) => o.value === value);
 
-  const updatePosition = () => {
+  const updatePosition = useCallback(() => {
     const el = triggerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -56,11 +56,11 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     const spaceBelow = window.innerHeight - rect.bottom;
     const top = spaceBelow < 240 && rect.top > 260 ? rect.top - 250 : rect.bottom + 8;
     setCoords({ top, left, width: menuW });
-  };
+  }, [align]);
 
   useLayoutEffect(() => {
     if (open) updatePosition();
-  }, [open, align]);
+  }, [open, updatePosition]);
 
   useEffect(() => {
     if (!open) return;
@@ -90,7 +90,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       window.removeEventListener('scroll', onScrollOrResize, true);
       window.removeEventListener('resize', onScrollOrResize);
     };
-  }, [open, align]);
+  }, [open, updatePosition]);
 
   const filtered = query.trim()
     ? options.filter(

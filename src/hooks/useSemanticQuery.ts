@@ -26,14 +26,14 @@ export function useSemanticQuery<T = Record<string, any>>(params: SemanticQueryP
   const key = params ? JSON.stringify(params) : '';
 
   const refetch = useCallback(async () => {
-    if (!params) return;
+    if (!key) return;
     setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/semantic/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
+        body: key,
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);

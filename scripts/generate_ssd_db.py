@@ -12,6 +12,8 @@ conn = sqlite3.connect(DB_PATH)
 cur = conn.cursor()
 
 cur.executescript("""
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
 CREATE TABLE ssd_models (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,

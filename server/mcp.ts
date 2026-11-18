@@ -1,4 +1,6 @@
 import readline from 'node:readline';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   executeSemanticQuery,
   listDataSources,
@@ -91,6 +93,18 @@ const TOOLS = [
       required: ['title', 'summary_md'],
     },
   },
+  {
+    name: 'check_space_compliance',
+    description:
+      'Validate a team space plugin folder under src/spaces/<spaceId>/ for required meta.ts, index.tsx, forbidden imports, and raw <select> usage.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        spaceId: { type: 'string', description: 'Folder name under src/spaces/ (e.g. alice-fw)' },
+      },
+      required: ['spaceId'],
+    },
+  },
 ];
 
 function send(msg: any) {
@@ -163,6 +177,20 @@ rl.on('line', (line) => {
         payload = { insights: listAIInsights(args.scope) };
       } else if (name === 'publish_ai_insight') {
         payload = { published: publishAIInsight(args) };
+      } else if (name === 'check_space_compliance') {
+        const spaceId = String(args.spaceId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+        const dir = path.resolve(process.cwd(), 'src/spaces', spaceId);
+        const issues: string[] = [];
+        if (!fs.existsSync(path.join(dir, 'meta.ts'))) issues.push('Missing meta.ts');
+        if (!fs.existsSync(path.join(dir, 'index.tsx'))) issues.push('Missing index.tsx');
+        const idxPath = path.join(dir, 'index.tsx');
+        if (fs.existsSync(idxPath)) {
+          const src = fs.readFileSync(idxPath, 'utf-8');
+          if (src.includes('<select')) issues.push('Forbidden native <select> found; use CustomSelect');
+          if (src.includes('dangerouslySetInnerHTML')) issues.push('Forbidden dangerouslySetInnerHTML found');
+          if (src.includes('server/')) issues.push('Forbidden server/ import found');
+        }
+        payload = { spaceId, passed: issues.length === 0, issues };
       } else {
         throw new Error(`Unknown tool: ${name}`);
       }

@@ -27,6 +27,7 @@ const personalDbPath = path.resolve(process.cwd(), 'data/personal_datasets.db');
 const personalDb = new DatabaseSync(personalDbPath);
 personalDb.exec(`
   PRAGMA journal_mode = WAL;
+  PRAGMA synchronous = NORMAL;
   PRAGMA busy_timeout = 3000;
   CREATE TABLE IF NOT EXISTS user_datasets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

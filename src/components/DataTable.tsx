@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { CustomSelect } from './CustomSelect';
 import {
   ArrowDown,
   ArrowLeft,
@@ -68,6 +69,8 @@ export function DataTable<T>({
   const [pageSize, setPageSize] = useState(defaultPageSize);
 
   // Column order & visibility state (syncs when column schema changes)
+  const initialColumnsRef = useRef(initialColumns);
+  initialColumnsRef.current = initialColumns;
   const colSchemaKey = initialColumns.map((c) => c.key).join('|');
   const [colOrder, setColOrder] = useState<string[]>(() => initialColumns.map((c) => c.key));
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(
@@ -77,8 +80,9 @@ export function DataTable<T>({
   const [copiedAi, setCopiedAi] = useState(false);
 
   useEffect(() => {
-    setColOrder(initialColumns.map((c) => c.key));
-    setHiddenCols(new Set(initialColumns.filter((c) => c.visible === false).map((c) => c.key)));
+    const cols = initialColumnsRef.current;
+    setColOrder(cols.map((c) => c.key));
+    setHiddenCols(new Set(cols.filter((c) => c.visible === false).map((c) => c.key)));
     setSortKey(null);
     setSortDir(null);
     setPage(1);
@@ -551,20 +555,19 @@ export function DataTable<T>({
             Showing {sortedData.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–
             {Math.min(safePage * pageSize, sortedData.length)} of {sortedData.length} rows
           </span>
-          <select
-            value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
+          <CustomSelect
+            value={String(pageSize)}
+            onChange={(val) => {
+              setPageSize(Number(val));
               setPage(1);
             }}
-            className="bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-md px-1.5 py-0.5 text-[11px] text-[var(--text-primary)] cursor-pointer"
-          >
-            {[10, 25, 50, 100].map((sz) => (
-              <option key={sz} value={sz}>
-                {sz} / page
-              </option>
-            ))}
-          </select>
+            align="left"
+            className="w-28"
+            options={[10, 25, 50, 100].map((sz) => ({
+              value: String(sz),
+              label: `${sz} / page`,
+            }))}
+          />
         </div>
 
         <div className="flex items-center gap-1.5">

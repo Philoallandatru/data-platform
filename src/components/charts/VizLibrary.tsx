@@ -2,19 +2,21 @@ import React, { useMemo, useState } from 'react';
 import { BenchmarkRun, FirmwareVersion, TestItem } from '../../types/ssd';
 import { Activity, BarChart3, Flame, Grid, Radar as RadarIcon, ScatterChart } from 'lucide-react';
 
+const RADAR_AXES = [
+  { id: 'SEQ_128K_Q32_R', label: 'Seq Read' },
+  { id: 'SEQ_128K_Q32_W', label: 'Seq Write' },
+  { id: 'RAND_4K_Q64T8_R', label: '4K Peak IOPS' },
+  { id: 'MIXED_70R_30W', label: 'Mixed OLTP' },
+  { id: 'ZNS_APPEND', label: 'ZNS Append' },
+  { id: 'RAND_4K_Q1T1_R', label: 'Low-QD 4K' },
+];
+
 /* 1. Multi-Axis Firmware Radar / Spider Chart */
 export const FirmwareRadarChart: React.FC<{
   runs: BenchmarkRun[];
   firmwares: FirmwareVersion[];
 }> = ({ runs, firmwares }) => {
-  const axes = [
-    { id: 'SEQ_128K_Q32_R', label: 'Seq Read' },
-    { id: 'SEQ_128K_Q32_W', label: 'Seq Write' },
-    { id: 'RAND_4K_Q64T8_R', label: '4K Peak IOPS' },
-    { id: 'MIXED_70R_30W', label: 'Mixed OLTP' },
-    { id: 'ZNS_APPEND', label: 'ZNS Append' },
-    { id: 'RAND_4K_Q1T1_R', label: 'Low-QD 4K' },
-  ];
+  const axes = RADAR_AXES;
 
   const compareIds = ['fw-104', 'fw-142', 'fw-213'];
   const colors: Record<string, string> = {
@@ -29,7 +31,7 @@ export const FirmwareRadarChart: React.FC<{
 
   const maxPerAxis = useMemo(() => {
     const map: Record<string, number> = {};
-    axes.forEach((ax) => {
+    RADAR_AXES.forEach((ax) => {
       map[ax.id] = Math.max(1, ...runs.filter((r) => r.test_id === ax.id).map((r) => r.throughput_mbps));
     });
     return map;

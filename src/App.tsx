@@ -153,15 +153,17 @@ export function App() {
       .catch((err) => setError(err?.message || 'Failed to load SQLite telemetry'));
   };
 
+  const currentUserId = session?.user?.id;
+
   useEffect(() => {
-    if (session?.user) {
+    if (currentUserId) {
       fetchTelemetry(true);
     }
-  }, [session?.user?.id]);
+  }, [currentUserId]);
 
   // Poll SQLite PRAGMA data_version every 5s when authenticated
   useEffect(() => {
-    if (!session?.user) return;
+    if (!currentUserId) return;
     const timer = setInterval(() => {
       fetch('/api/ssd-version')
         .then((r) => (r.ok ? r.json() : null))
@@ -177,7 +179,7 @@ export function App() {
         .catch(() => {});
     }, 5000);
     return () => clearInterval(timer);
-  }, [session?.user?.id]);
+  }, [currentUserId]);
 
   const currentModel = useMemo(
     () => data?.models.find((m) => m.id === selectedModelId) || data?.models[0],
