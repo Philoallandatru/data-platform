@@ -9,7 +9,6 @@ import {
 import {
   ChevronDown,
   ChevronRight,
-  FilePlus2,
   Gauge,
   HardDrive,
   Home,
