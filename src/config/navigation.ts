@@ -1,4 +1,4 @@
-export type ModuleKey = 'performance' | 'power' | 'showcase' | 'custom' | 'myspace' | 'admin';
+export type ModuleKey = 'home' | 'performance' | 'power' | 'showcase' | 'custom' | 'myspace' | 'admin';
 
 export interface SubPageConfig {
   id: string;

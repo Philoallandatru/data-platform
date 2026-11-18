@@ -31,6 +31,9 @@ const AdminPage = lazy(() =>
 const MySpacePage = lazy(() =>
   import('./pages/MySpacePage').then((m) => ({ default: m.MySpacePage }))
 );
+const HomePage = lazy(() =>
+  import('./pages/HomePage').then((m) => ({ default: m.HomePage }))
+);
 import {
   Activity,
   ChevronRight,
@@ -44,6 +47,43 @@ import {
   X,
 } from 'lucide-react';
 
+function parseUrlPath(pathname: string): {
+  module: ModuleKey;
+  subPageId: string;
+  modelId?: string;
+} {
+  const parts = pathname.split('/').filter(Boolean);
+  if (parts.length === 0 || parts[0] === 'home') {
+    return { module: 'home', subPageId: 'overview' };
+  }
+  if (parts[0] === 'product' && parts[1] && (parts[2] === 'performance' || parts[2] === 'power')) {
+    return {
+      module: parts[2],
+      modelId: parts[1],
+      subPageId: parts[3] || (parts[2] === 'performance' ? 'cdmark' : 'active-power'),
+    };
+  }
+  if (parts[0] === 'custom') {
+    return { module: 'custom', subPageId: parts[1] || 'custom-fw' };
+  }
+  if (parts[0] === 'myspace') return { module: 'myspace', subPageId: 'personal' };
+  if (parts[0] === 'showcase') return { module: 'showcase', subPageId: 'gallery' };
+  if (parts[0] === 'admin') return { module: 'admin', subPageId: 'console' };
+  return { module: 'home', subPageId: 'overview' };
+}
+
+function buildUrlPath(module: ModuleKey, subPageId: string, modelId: string): string {
+  if (module === 'home') return '/';
+  if (module === 'performance' || module === 'power') {
+    return `/product/${modelId}/${module}/${subPageId}`;
+  }
+  if (module === 'custom') return `/custom/${subPageId}`;
+  if (module === 'myspace') return '/myspace';
+  if (module === 'showcase') return '/showcase';
+  if (module === 'admin') return '/admin';
+  return '/';
+}
+
 export function App() {
   const { data: session, isPending: sessionPending, refetch: refetchSession } = useSession();
   const [theme, setTheme] = useState<ThemeMode>(() => {
@@ -54,14 +94,27 @@ export function App() {
   const [data, setData] = useState<SSDTelemetryPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedModelId, setSelectedModelId] = useState<string>('x900-2tb');
+  const initialRoute = useMemo(() => parseUrlPath(window.location.pathname), []);
+  const [selectedModelId, setSelectedModelId] = useState<string>(initialRoute.modelId || 'x900-2tb');
   const [selectedFirmwareId, setSelectedFirmwareId] = useState<string>('fw-213');
   const [selectedTestId, setSelectedTestId] = useState<string>('SEQ_128K_Q32_R');
 
-  const [activeModule, setActiveModule] = useState<ModuleKey>('performance');
-  const [activeSubPageId, setActiveSubPageId] = useState<string>('cdmark');
+  const [activeModule, setActiveModule] = useState<ModuleKey>(initialRoute.module);
+  const [activeSubPageId, setActiveSubPageId] = useState<string>(initialRoute.subPageId);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dbSignature, setDbSignature] = useState<string | null>(null);
+
+  // Sync browser Back/Forward navigation
+  useEffect(() => {
+    const onPopState = () => {
+      const r = parseUrlPath(window.location.pathname);
+      setActiveModule(r.module);
+      setActiveSubPageId(r.subPageId);
+      if (r.modelId) setSelectedModelId(r.modelId);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -171,11 +224,23 @@ export function App() {
     );
   }, [data]);
 
-  const handleNavigate = (module: ModuleKey, subPageId: string, defaultTestId?: string) => {
+  const handleNavigate = (
+    module: ModuleKey,
+    subPageId: string,
+    modelId?: string,
+    defaultTestId?: string
+  ) => {
+    const nextModel = modelId || selectedModelId;
+    if (modelId) setSelectedModelId(modelId);
     setActiveModule(module);
     setActiveSubPageId(subPageId);
     if (defaultTestId) setSelectedTestId(defaultTestId);
     setMobileMenuOpen(false);
+
+    const nextPath = buildUrlPath(module, subPageId, nextModel);
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, '', nextPath);
+    }
   };
 
   const handleJump = (fwId: string, testId: string) => {
@@ -277,27 +342,45 @@ export function App() {
               </div>
 
               <div className="hidden md:flex items-center gap-1 text-[11px] text-[var(--text-secondary)] truncate">
-                <span>{currentModel.name}</span>
-                <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
-                <span className="capitalize">
-                  {activeModule === 'showcase'
-                    ? 'Viz Gallery'
-                    : activeModule === 'custom'
-                    ? 'Custom'
-                    : activeModule === 'myspace'
-                    ? 'My Space'
-                    : activeModule === 'admin'
-                    ? 'Admin'
-                    : activeModule}
-                </span>
-                {activeModule !== 'showcase' && activeModule !== 'admin' && activeModule !== 'myspace' && (
+                <button
+                  onClick={() => handleNavigate('home', 'overview')}
+                  className="hover:text-[#FF6B2C] transition cursor-pointer"
+                >
+                  Home
+                </button>
+                {activeModule !== 'home' && (
                   <>
                     <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
-                    <span className="text-[#FF6B2C] font-medium">
-                      {activeModule === 'custom' ? activeCustomPage.label : activeSuiteConfig.shortLabel}
+                    {(activeModule === 'performance' || activeModule === 'power') && (
+                      <>
+                        <span>{currentModel.name}</span>
+                        <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
+                      </>
+                    )}
+                    <span className="capitalize">
+                      {activeModule === 'showcase'
+                        ? 'Viz Gallery'
+                        : activeModule === 'custom'
+                        ? 'Custom'
+                        : activeModule === 'myspace'
+                        ? 'My Space'
+                        : activeModule === 'admin'
+                        ? 'Admin'
+                        : activeModule}
                     </span>
                   </>
                 )}
+                {activeModule !== 'home' &&
+                  activeModule !== 'showcase' &&
+                  activeModule !== 'admin' &&
+                  activeModule !== 'myspace' && (
+                    <>
+                      <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
+                      <span className="text-[#FF6B2C] font-medium">
+                        {activeModule === 'custom' ? activeCustomPage.label : activeSuiteConfig.shortLabel}
+                      </span>
+                    </>
+                  )}
               </div>
             </div>
           </div>
@@ -373,7 +456,6 @@ export function App() {
           <Sidebar
             models={data.models}
             selectedModelId={selectedModelId}
-            onSelectModel={setSelectedModelId}
             activeModule={activeModule}
             activeSubPageId={activeSubPageId}
             onNavigate={handleNavigate}
@@ -387,7 +469,6 @@ export function App() {
               <Sidebar
                 models={data.models}
                 selectedModelId={selectedModelId}
-                onSelectModel={setSelectedModelId}
                 activeModule={activeModule}
                 activeSubPageId={activeSubPageId}
                 onNavigate={handleNavigate}
@@ -402,7 +483,7 @@ export function App() {
         )}
 
         <main className="flex-1 min-w-0 p-4 sm:p-6 space-y-5 overflow-y-auto">
-          {activeModule !== 'admin' && (
+          {activeModule !== 'admin' && activeModule !== 'home' && (
             <>
               <TelemetryExplorer
                 runs={data.runs}
@@ -436,6 +517,19 @@ export function App() {
               </div>
             }
           >
+            {activeModule === 'home' && (
+              <HomePage
+                models={data.models}
+                firmwares={data.firmwares}
+                testItems={data.testItems}
+                runs={data.runs}
+                insights={data.aiInsights || []}
+                totalRows={totalRows}
+                onNavigateRoute={handleNavigate}
+                onRefresh={() => fetchTelemetry(false)}
+              />
+            )}
+
             {activeModule === 'performance' && (
               <PerformanceSuitePage
                 suite={activeSuiteConfig}
