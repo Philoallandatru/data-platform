@@ -12,10 +12,15 @@ const authDbPath = path.join(dataDir, 'auth.db');
 export const authDb = new DatabaseSync(authDbPath);
 authDb.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 3000;');
 
+const authSecret = process.env.BETTER_AUTH_SECRET;
+if (process.env.NODE_ENV === 'production' && !authSecret) {
+  throw new Error('[Auth] BETTER_AUTH_SECRET must be set in production');
+}
+
 export const auth = betterAuth({
   database: authDb,
   baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:5180',
-  secret: process.env.BETTER_AUTH_SECRET || 'pulse-lab-dev-secret-change-in-production-2026',
+  secret: authSecret || 'pulse-lab-dev-secret-change-in-production-2026',
   trustedOrigins: ['http://localhost:5180', 'http://localhost:3001'],
   emailAndPassword: {
     enabled: true,

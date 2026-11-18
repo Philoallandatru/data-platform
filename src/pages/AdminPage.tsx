@@ -105,20 +105,33 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  const handleChangeRole = async (userId: string, role: string) => {
-    await authClient.admin.setRole({ userId, role: role as any });
-    setMsg(`Updated role to ${role}`);
-    loadUsers();
-  };
+  const handleChangeRole = useCallback(
+    async (userId: string, role: string) => {
+      const res = await authClient.admin.setRole({ userId, role: role as any });
+      if (res.error) {
+        setMsg(`Role update failed: ${res.error.message}`);
+      } else {
+        setMsg(`Updated role to ${role}`);
+        loadUsers();
+      }
+    },
+    [loadUsers]
+  );
 
-  const handleToggleBan = async (u: AdminUserRow) => {
-    if (u.banned) {
-      await authClient.admin.unbanUser({ userId: u.id });
-    } else {
-      await authClient.admin.banUser({ userId: u.id, banReason: 'Admin action' });
-    }
-    loadUsers();
-  };
+  const handleToggleBan = useCallback(
+    async (u: AdminUserRow) => {
+      const res = u.banned
+        ? await authClient.admin.unbanUser({ userId: u.id })
+        : await authClient.admin.banUser({ userId: u.id, banReason: 'Admin action' });
+      if (res.error) {
+        setMsg(`Action failed: ${res.error.message}`);
+      } else {
+        setMsg(`${u.banned ? 'Unbanned' : 'Banned'} ${u.email}`);
+        loadUsers();
+      }
+    },
+    [loadUsers]
+  );
 
   const handleSsdMaintenance = async () => {
     setMsg('Running WAL checkpoint & ANALYZE...');
@@ -204,7 +217,7 @@ export const AdminPage: React.FC = () => {
         ),
       },
     ],
-    []
+    [handleChangeRole, handleToggleBan]
   );
 
   return (

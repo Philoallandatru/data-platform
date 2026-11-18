@@ -1,10 +1,13 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { DatabaseSync } from 'node:sqlite';
+import fs from 'node:fs';
 import path from 'node:path';
 import { auth, initAuthDatabase } from './auth';
 import {
   executeSemanticQuery,
+  getPoolDb,
   listDataSources,
   SEMANTIC_DATASETS,
   setActiveDataSources,
@@ -12,15 +15,6 @@ import {
 
 const app = new Hono();
 const ssdDbPath = path.resolve(process.cwd(), 'data/ssd_benchmark.db');
-let sharedSsdDb: DatabaseSync | null = null;
-
-function getSsdDb() {
-  if (!sharedSsdDb) {
-    sharedSsdDb = new DatabaseSync(ssdDbPath, { open: true, readOnly: true });
-    sharedSsdDb.exec('PRAGMA busy_timeout = 3000;');
-  }
-  return sharedSsdDb;
-}
 
 // 1. Mount Better Auth handler (Sign-in, Sign-out, Session, Admin CRUD)
 app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw));
@@ -30,13 +24,13 @@ async function requireSession(req: Request) {
   return auth.api.getSession({ headers: req.headers });
 }
 
-// 3. Lightweight SQLite version check (PRAGMA data_version)
+// 3. Lightweight SQLite version check (PRAGMA data_version) via shared pool
 app.get('/api/ssd-version', async (c) => {
   const session = await requireSession(c.req.raw);
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
   try {
-    const db = getSsdDb();
+    const db = getPoolDb('ssd_benchmark');
     const dv = db.prepare('PRAGMA data_version').get() as { data_version: number };
     const runsCount = db.prepare('SELECT COUNT(*) as c FROM benchmark_runs').get() as { c: number };
     const tsCount = db.prepare('SELECT COUNT(*) as c FROM power_telemetry_timeseries').get() as { c: number };
@@ -49,18 +43,17 @@ app.get('/api/ssd-version', async (c) => {
       checkedAt: Date.now(),
     });
   } catch (err: any) {
-    sharedSsdDb = null;
     return c.json({ error: err?.message || 'Version check failed' }, 500);
   }
 });
 
-// 4. Full SSD Telemetry payload
+// 4. Full SSD Telemetry payload via shared pool
 app.get('/api/ssd-telemetry', async (c) => {
   const session = await requireSession(c.req.raw);
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
   try {
-    const db = getSsdDb();
+    const db = getPoolDb('ssd_benchmark');
     const models = db.prepare('SELECT * FROM ssd_models').all();
     const firmwares = db.prepare('SELECT * FROM firmware_versions').all();
     const testItems = db.prepare('SELECT * FROM test_items').all();
@@ -86,7 +79,6 @@ app.get('/api/ssd-telemetry', async (c) => {
       alerts,
     });
   } catch (err: any) {
-    sharedSsdDb = null;
     return c.json({ error: err?.message || 'SQLite query failed' }, 500);
   }
 });
@@ -150,6 +142,13 @@ app.post('/api/admin/datasources', async (c) => {
   const activeIds = Array.isArray(body?.activeIds) ? body.activeIds : [];
   return c.json({ datasources: setActiveDataSources(activeIds) });
 });
+
+// 8. Production static asset serving (when dist/ exists)
+const distDir = path.resolve(process.cwd(), 'dist');
+if (fs.existsSync(distDir)) {
+  app.use('/*', serveStatic({ root: './dist' }));
+  app.get('*', serveStatic({ path: './dist/index.html' }));
+}
 
 const PORT = Number(process.env.API_PORT || 3001);
 
