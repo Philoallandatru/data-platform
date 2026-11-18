@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --port 5180 --strictPort",
     "server": "tsx server/index.ts",
+    "mcp": "tsx server/mcp.ts",
+    "ai:cli": "tsx scripts/ai_cli.ts",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },

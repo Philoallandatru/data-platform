@@ -71,6 +71,17 @@ export interface RegressionAlert {
   delta_metric: string;
 }
 
+export interface AIInsight {
+  id: number;
+  scope: string;
+  agent_name: string;
+  severity: 'info' | 'improvement' | 'warning' | 'critical';
+  title: string;
+  summary_md: string;
+  metrics: { label: string; value: string }[];
+  created_at: string;
+}
+
 export interface SSDTelemetryPayload {
   source: string;
   counts: {
@@ -80,6 +91,7 @@ export interface SSDTelemetryPayload {
     runs: number;
     timeseries: number;
     alerts: number;
+    aiInsights?: number;
   };
   models: SSDModel[];
   firmwares: FirmwareVersion[];
@@ -87,4 +99,5 @@ export interface SSDTelemetryPayload {
   runs: BenchmarkRun[];
   timeseries: PowerTimeseriesPoint[];
   alerts: RegressionAlert[];
+  aiInsights?: AIInsight[];
 }

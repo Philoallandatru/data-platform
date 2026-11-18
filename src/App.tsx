@@ -9,6 +9,7 @@ import {
 import { Sidebar } from './components/Sidebar';
 import { CustomSelect } from './components/CustomSelect';
 import { TelemetryExplorer } from './components/TelemetryExplorer';
+import { AIInsightsPanel } from './components/AIInsightsPanel';
 import { LoginView } from './components/LoginView';
 import { signOut, useSession } from './lib/authClient';
 
@@ -402,15 +403,30 @@ export function App() {
 
         <main className="flex-1 min-w-0 p-4 sm:p-6 space-y-5 overflow-y-auto">
           {activeModule !== 'admin' && (
-            <TelemetryExplorer
-              runs={data.runs}
-              firmwares={data.firmwares}
-              testItems={data.testItems}
-              selectedModelId={selectedModelId}
-              selectedTestId={selectedTestId}
-              onJump={handleJump}
-              totalRows={totalRows}
-            />
+            <>
+              <TelemetryExplorer
+                runs={data.runs}
+                firmwares={data.firmwares}
+                testItems={data.testItems}
+                selectedModelId={selectedModelId}
+                selectedTestId={selectedTestId}
+                onJump={handleJump}
+                totalRows={totalRows}
+              />
+              <AIInsightsPanel
+                insights={data.aiInsights || []}
+                scope={
+                  activeModule === 'myspace'
+                    ? 'myspace'
+                    : activeModule === 'showcase'
+                    ? 'global'
+                    : activeModule === 'custom'
+                    ? activeCustomPage.id
+                    : activeSuiteConfig.id
+                }
+                onDeleted={() => fetchTelemetry(false)}
+              />
+            </>
           )}
 
           <Suspense

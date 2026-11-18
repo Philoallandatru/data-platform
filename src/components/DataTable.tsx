@@ -5,8 +5,10 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowUpDown,
+  Check,
   CheckSquare,
   Columns3,
+  Copy,
   Download,
   Search,
   Square,
@@ -72,6 +74,7 @@ export function DataTable<T>({
     () => new Set(initialColumns.filter((c) => c.visible === false).map((c) => c.key))
   );
   const [showColMenu, setShowColMenu] = useState(false);
+  const [copiedAi, setCopiedAi] = useState(false);
 
   useEffect(() => {
     setColOrder(initialColumns.map((c) => c.key));
@@ -219,6 +222,31 @@ export function DataTable<T>({
     URL.revokeObjectURL(url);
   };
 
+  const copyForAi = async () => {
+    const targetRows =
+      selectedIds.size > 0
+        ? sortedData.filter((r) => selectedIds.has(getRowId(r)))
+        : sortedData.slice(0, 60);
+    const headers = visibleColumns.map((c) => c.header);
+    const mdHeader = `| ${headers.join(' | ')} |`;
+    const mdSep = `| ${headers.map(() => '---').join(' | ')} |`;
+    const mdRows = targetRows.map(
+      (r) => `| ${visibleColumns.map((c) => String(c.accessor(r))).join(' | ')} |`
+    );
+    const prompt = [
+      `### ${title} (${targetRows.length} rows)`,
+      '请分析以下 SSD 遥测数据表的关键性能/功耗趋势、异常点并给出结论：',
+      '',
+      mdHeader,
+      mdSep,
+      ...mdRows,
+    ].join('\n');
+
+    await navigator.clipboard.writeText(prompt);
+    setCopiedAi(true);
+    setTimeout(() => setCopiedAi(false), 2000);
+  };
+
   return (
     <div className="bento-card rounded-2xl p-5 space-y-4">
       {/* Header & Controls */}
@@ -260,6 +288,25 @@ export function DataTable<T>({
           >
             <Columns3 className="w-3.5 h-3.5 text-[#00B4D8]" />
             Columns
+          </button>
+
+          {/* Copy Markdown Table for AI Agent */}
+          <button
+            onClick={copyForAi}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+            title="Copy filtered/selected rows as Markdown prompt for AI analysis"
+          >
+            {copiedAi ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="text-emerald-500">Copied MD!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5 text-[#A855F7]" />
+                Copy for AI
+              </>
+            )}
           </button>
 
           {/* Export CSV */}

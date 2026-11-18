@@ -12,6 +12,14 @@ import {
   SEMANTIC_DATASETS,
   setActiveDataSources,
 } from './semantic';
+import {
+  deleteAIInsight,
+  ensureInsightsTable,
+  listAIInsights,
+  publishAIInsight,
+} from './insights';
+
+ensureInsightsTable();
 
 const app = new Hono();
 const ssdDbPath = path.resolve(process.cwd(), 'data/ssd_benchmark.db');
@@ -50,11 +58,13 @@ app.get('/api/ssd-version', async (c) => {
     const runsCount = db.prepare('SELECT COUNT(*) as c FROM benchmark_runs').get() as { c: number };
     const tsCount = db.prepare('SELECT COUNT(*) as c FROM power_telemetry_timeseries').get() as { c: number };
     const alertsCount = db.prepare('SELECT COUNT(*) as c FROM regression_alerts').get() as { c: number };
+    const insRow = db.prepare('SELECT COUNT(*) as c, COALESCE(MAX(id), 0) as m FROM ai_insights').get() as { c: number; m: number };
     return c.json({
       data_version: dv?.data_version ?? 1,
-      signature: `${dv?.data_version ?? 1}-${runsCount?.c ?? 0}-${tsCount?.c ?? 0}-${alertsCount?.c ?? 0}`,
+      signature: `${dv?.data_version ?? 1}-${runsCount?.c ?? 0}-${tsCount?.c ?? 0}-${alertsCount?.c ?? 0}-${insRow?.c ?? 0}-${insRow?.m ?? 0}`,
       runs: runsCount?.c ?? 0,
       timeseries: tsCount?.c ?? 0,
+      insights: insRow?.c ?? 0,
       checkedAt: Date.now(),
     });
   } catch (err: any) {
@@ -75,6 +85,7 @@ app.get('/api/ssd-telemetry', async (c) => {
     const runs = db.prepare('SELECT * FROM benchmark_runs').all();
     const timeseries = db.prepare('SELECT * FROM power_telemetry_timeseries ORDER BY elapsed_sec ASC').all();
     const alerts = db.prepare('SELECT * FROM regression_alerts').all();
+    const aiInsights = listAIInsights('all');
 
     return c.json({
       source: 'sqlite:data/ssd_benchmark.db',
@@ -85,6 +96,7 @@ app.get('/api/ssd-telemetry', async (c) => {
         runs: runs.length,
         timeseries: timeseries.length,
         alerts: alerts.length,
+        aiInsights: aiInsights.length,
       },
       models,
       firmwares,
@@ -92,6 +104,7 @@ app.get('/api/ssd-telemetry', async (c) => {
       runs,
       timeseries,
       alerts,
+      aiInsights,
     });
   } catch (err: any) {
     return c.json({ error: err?.message || 'SQLite query failed' }, 500);
@@ -322,6 +335,33 @@ app.delete('/api/personal-datasets', async (c) => {
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
   personalDb.prepare('DELETE FROM user_datasets WHERE user_id = ?').run(session.user.id);
+  return c.json({ ok: true });
+});
+
+// 10. AI Agent Insights Endpoints (published via MCP, CLI, or Web)
+app.get('/api/insights', async (c) => {
+  const session = await requireSession(c.req.raw);
+  if (!session) return c.json({ error: 'Unauthorized' }, 401);
+  const scope = c.req.query('scope') || 'all';
+  return c.json({ insights: listAIInsights(scope) });
+});
+
+app.post('/api/insights', async (c) => {
+  const session = await requireSession(c.req.raw);
+  if (!session) return c.json({ error: 'Unauthorized' }, 401);
+  try {
+    const body = await c.req.json();
+    const created = publishAIInsight(body);
+    return c.json({ ok: true, insight: created });
+  } catch (err: any) {
+    return c.json({ error: err?.message || 'Failed to publish insight' }, 400);
+  }
+});
+
+app.delete('/api/insights/:id', async (c) => {
+  const session = await requireSession(c.req.raw);
+  if (!session) return c.json({ error: 'Unauthorized' }, 401);
+  deleteAIInsight(Number(c.req.param('id')));
   return c.json({ ok: true });
 });
 
