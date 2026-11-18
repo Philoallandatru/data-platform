@@ -17,6 +17,7 @@ import {
   PanelLeftOpen,
   Shield,
   User,
+  Users,
   Zap,
 } from 'lucide-react';
 
@@ -290,6 +291,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <User className="w-4 h-4 text-[#00B4D8] shrink-0" />
             {!collapsed && <span>我的空间 (/myspace)</span>}
+          </button>
+
+          <button
+            onClick={() => onNavigate('spaces', 'directory')}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer border ${
+              activeModule === 'spaces'
+                ? 'bg-[#A855F7]/15 border-[#A855F7]/50 text-[#A855F7]'
+                : 'bg-[var(--bg-subtle)] border-[var(--border-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <Users className="w-4 h-4 text-[#A855F7] shrink-0" />
+            {!collapsed && <span>团队空间 (/spaces)</span>}
           </button>
 
           <button

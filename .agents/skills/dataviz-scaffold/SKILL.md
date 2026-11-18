@@ -29,5 +29,10 @@ description: 在 data-platform 可视化脚手架中新增图表组件、Bento �
    - 下拉选择统一使用 `src/components/CustomSelect.tsx`（内置 `createPortal` 防 `backdrop-filter` 遮挡，禁止使用原生 `<select>`）。
    - 复杂图表参考 `src/components/charts/VizLibrary.tsx` 或 `src/components/FirmwareTopology3D.tsx`。
 
-5. **验证构建**
-   - 每次修改完成后必须执行 `npm run build`（`tsc -b && vite build`），确保零 TypeScript 报错（`noUnusedLocals: true`）且产物按预期拆包。
+5. **团队成员独立空间插件化规范（`src/spaces/<author>/`）**
+   - 每位成员只允许在 `src/spaces/<author-topic>/` 下新建 `meta.ts`（导出 `meta: SpaceMeta`）与 `index.tsx`（默认导出 React 组件），由 `src/spaces/registry.ts` 自动扫描懒加载并包裹 `<SpaceErrorBoundary>`。
+   - **严禁**个人空间页面直接修改 `src/App.tsx`、`src/components/Sidebar.tsx`、`server/` 或 `import` 其他人的空间目录与 `App.tsx`。
+   - 所有 `useSemanticQuery` 调用**必须**显式处理 `loading`、`error` 与空数组三态，禁止无保护的链式取值。
+
+6. **提交前强制门禁**
+   - 每次修改完成后必须执行 `npm run verify`（`tsc -b && npm run lint && npm run build`），GitHub Actions CI（`.github/workflows/ci.yml`）会在 PR 阶段执行同等强制校验。

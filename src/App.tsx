@@ -34,6 +34,9 @@ const MySpacePage = lazy(() =>
 const HomePage = lazy(() =>
   import('./pages/HomePage').then((m) => ({ default: m.HomePage }))
 );
+const TeamSpacesPage = lazy(() =>
+  import('./pages/TeamSpacesPage').then((m) => ({ default: m.TeamSpacesPage }))
+);
 import {
   Activity,
   ChevronRight,
@@ -66,6 +69,9 @@ function parseUrlPath(pathname: string): {
   if (parts[0] === 'custom') {
     return { module: 'custom', subPageId: parts[1] || 'custom-fw' };
   }
+  if (parts[0] === 'spaces') {
+    return { module: 'spaces', subPageId: parts[1] || 'directory' };
+  }
   if (parts[0] === 'myspace') return { module: 'myspace', subPageId: 'personal' };
   if (parts[0] === 'showcase') return { module: 'showcase', subPageId: 'gallery' };
   if (parts[0] === 'admin') return { module: 'admin', subPageId: 'console' };
@@ -78,6 +84,7 @@ function buildUrlPath(module: ModuleKey, subPageId: string, modelId: string): st
     return `/product/${modelId}/${module}/${subPageId}`;
   }
   if (module === 'custom') return `/custom/${subPageId}`;
+  if (module === 'spaces') return subPageId === 'directory' ? '/spaces' : `/spaces/${subPageId}`;
   if (module === 'myspace') return '/myspace';
   if (module === 'showcase') return '/showcase';
   if (module === 'admin') return '/admin';
@@ -610,6 +617,13 @@ export function App() {
                 activeRun={activeRun}
                 alerts={data.alerts}
                 onJump={handleJump}
+              />
+            )}
+
+            {activeModule === 'spaces' && (
+              <TeamSpacesPage
+                activeSpaceId={activeSubPageId}
+                onSelectSpace={(spaceId) => handleNavigate('spaces', spaceId)}
               />
             )}
 

@@ -1,0 +1,37 @@
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import reactHooks from 'eslint-plugin-react-hooks';
+
+export default tseslint.config(
+  { ignores: ['dist/**', 'node_modules/**', 'data/**'] },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+    },
+  },
+  // Strict isolation rules for team plugin spaces (src/spaces/*)
+  {
+    files: ['src/spaces/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/server/**', '../App*', '../../App*'],
+              message: 'Space pages must not import server/ or App.tsx directly.',
+            },
+          ],
+        },
+      ],
+    },
+  }
+);

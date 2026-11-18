@@ -93,7 +93,7 @@ export function listAIInsights(scope?: string): AIInsightRow[] {
   db.close();
 
   return rows.map((r) => {
-    let metrics: AIInsightMetric[] = [];
+    let metrics: AIInsightMetric[];
     try {
       metrics = JSON.parse(r.metrics_json || '[]');
     } catch {
