@@ -102,3 +102,25 @@
 - **打包体积分析**：`npx vite-bundle-visualizer` 可视化分析各依赖包体积占比。
 - **React 渲染剖析**：安装 **React Developer Tools → Profiler**，勾选 *Record why each component rendered* 定位无效重渲染。
 - **SQLite 查询调优**：对新增 SQL 统一执行 `EXPLAIN QUERY PLAN SELECT ...`，确保出现 `USING COVERING INDEX` 或 `SEARCH ... USING INDEX`，杜绝大表 `SCAN`。
+
+---
+
+## 6. 团队插件化空间、AI 联动与质量门禁
+
+### 6.1 团队成员独立空间插件（`src/spaces/<author>/`）
+每位成员无需修改 `App.tsx` 或 `Sidebar.tsx`，只需在 `src/spaces/<author>/` 下创建：
+- `meta.ts`：导出 `meta: SpaceMeta`（`id`、`title`、`author`、`team`、`description`、`tags`）
+- `index.tsx`：默认导出 React 组件（统一使用 `useSemanticQuery` 取数，显式处理 `loading / error / 空数组`）
+
+`src/spaces/registry.ts` 会通过 `import.meta.glob` 自动发现、按路由懒加载，并在 `TeamSpacesPage.tsx` 中用 `<SpaceErrorBoundary>` 隔离单页崩溃。
+
+### 6.2 本地 AI Agent 闭环（OpenCode / 千问）
+- **MCP Server**：`npm run mcp`（`server/mcp.ts`）提供 `get_telemetry_catalog`、`query_telemetry_table`、`list_ai_insights`、`publish_ai_insight`、`check_space_compliance`。
+- **CLI 工具**：`npm run ai:cli -- query ...` / `npm run ai:cli -- publish ...`，结论写入 `ai_insights` 表后网页 5 秒内自动展示在 `<AIInsightsPanel />`。
+
+### 6.3 提交前强制门禁
+```bash
+npm run verify          # 依次执行 tsc -b && eslint . && vite build（必须 0 error）
+npm run test:multiuser  # 运行多用户隔离与 RBAC 权限集成测试
+```
+GitHub Actions（`.github/workflows/ci.yml`）会在 PR 阶段自动执行同等校验。
