@@ -102,35 +102,30 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
   const [savingLayout, setSavingLayout] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
-  // Personal imported CSV/JSON dataset (stored in browser localStorage per userId)
-  const storageKey = `pulselab_personal_data_${userId}`;
-  const [importedName, setImportedName] = useState<string | null>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      return raw ? JSON.parse(raw).name : null;
-    } catch {
-      return null;
-    }
-  });
-  const [importedRows, setImportedRows] = useState<Record<string, any>[]>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      return raw ? JSON.parse(raw).rows : [];
-    } catch {
-      return [];
-    }
-  });
+  // Personal imported CSV/JSON dataset (persisted per userId in data/personal_datasets.db)
+  const [importedName, setImportedName] = useState<string | null>(null);
+  const [importedRows, setImportedRows] = useState<Record<string, any>[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
   const [xAxis, setXAxis] = useState<string>('');
   const [yAxis, setYAxis] = useState<string>('');
 
-  // Load saved widget preferences from auth.db
+  // Load saved widget preferences & personal dataset from SQLite
   useEffect(() => {
     fetch('/api/workspace')
       .then((r) => (r.ok ? r.json() : null))
       .then((res) => {
         if (Array.isArray(res?.widgets)) setWidgets(res.widgets);
+      })
+      .catch(() => {});
+
+    fetch('/api/personal-datasets')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        if (res?.dataset) {
+          setImportedName(res.dataset.name);
+          setImportedRows(Array.isArray(res.dataset.rows) ? res.dataset.rows : []);
+        }
       })
       .catch(() => {});
   }, [userId]);
@@ -182,14 +177,22 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
     }
   }, [importedHeaders, numericHeaders, xAxis, yAxis]);
 
-  const saveImportedData = (name: string, rows: Record<string, any>[]) => {
+  const saveImportedData = async (name: string, rows: Record<string, any>[]) => {
     setImportedName(name);
     setImportedRows(rows);
     setImportError(null);
     try {
-      localStorage.setItem(storageKey, JSON.stringify({ name, rows: rows.slice(0, 2000) }));
+      const res = await fetch('/api/personal-datasets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, rows: rows.slice(0, 5000) }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setImportError(err.error || 'Failed to persist dataset');
+      }
     } catch {
-      // ignore quota overflow
+      setImportError('Failed to save to server');
     }
   };
 
@@ -217,10 +220,10 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
     }
   };
 
-  const clearImported = () => {
+  const clearImported = async () => {
     setImportedName(null);
     setImportedRows([]);
-    localStorage.removeItem(storageKey);
+    await fetch('/api/personal-datasets', { method: 'DELETE' }).catch(() => {});
   };
 
   const dynamicColumns: ColumnDef<Record<string, any>>[] = useMemo(
@@ -326,7 +329,7 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
           <div className="flex items-center gap-2">
             <FileSpreadsheet className="w-4 h-4 text-[#FF6B2C]" />
             <h3 className="font-display text-base font-semibold text-[var(--text-primary)]">
-              个人数据导入区（CSV / JSON 本地解析，不污染主库）
+              个人数据导入区（持久化至 personal_datasets.db，绝不污染主库）
             </h3>
           </div>
           <div className="flex items-center gap-2">

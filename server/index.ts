@@ -15,6 +15,21 @@ import {
 
 const app = new Hono();
 const ssdDbPath = path.resolve(process.cwd(), 'data/ssd_benchmark.db');
+const personalDbPath = path.resolve(process.cwd(), 'data/personal_datasets.db');
+const personalDb = new DatabaseSync(personalDbPath);
+personalDb.exec(`
+  PRAGMA journal_mode = WAL;
+  PRAGMA busy_timeout = 3000;
+  CREATE TABLE IF NOT EXISTS user_datasets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    row_count INTEGER NOT NULL,
+    rows_json TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_user_datasets_uid ON user_datasets(user_id, updated_at DESC);
+`);
 
 // 1. Mount Better Auth handler (Sign-in, Sign-out, Session, Admin CRUD)
 app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw));
@@ -184,7 +199,57 @@ app.put('/api/workspace', async (c) => {
   return c.json({ ok: true, widgets, updatedAt: now });
 });
 
-// 9. Production static asset serving (when dist/ exists)
+// 9. Personal Imported Datasets Persistence (isolated in data/personal_datasets.db)
+app.get('/api/personal-datasets', async (c) => {
+  const session = await requireSession(c.req.raw);
+  if (!session) return c.json({ error: 'Unauthorized' }, 401);
+
+  const row = personalDb
+    .prepare('SELECT id, name, row_count, rows_json, updated_at FROM user_datasets WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1')
+    .get(session.user.id) as { id: number; name: string; row_count: number; rows_json: string; updated_at: number } | undefined;
+
+  if (!row) return c.json({ dataset: null });
+  return c.json({
+    dataset: {
+      id: row.id,
+      name: row.name,
+      rowCount: row.row_count,
+      rows: JSON.parse(row.rows_json),
+      updatedAt: row.updated_at,
+    },
+  });
+});
+
+app.post('/api/personal-datasets', async (c) => {
+  const session = await requireSession(c.req.raw);
+  if (!session) return c.json({ error: 'Unauthorized' }, 401);
+
+  const body = await c.req.json();
+  const name = String(body?.name || 'personal_data.csv').slice(0, 120);
+  const rows = Array.isArray(body?.rows) ? body.rows.slice(0, 5000) : [];
+  const rowsJson = JSON.stringify(rows);
+  if (rowsJson.length > 5 * 1024 * 1024) {
+    return c.json({ error: 'Dataset too large for personal snapshot (max 5MB JSON)' }, 413);
+  }
+
+  const now = Date.now();
+  personalDb.prepare('DELETE FROM user_datasets WHERE user_id = ?').run(session.user.id);
+  personalDb
+    .prepare('INSERT INTO user_datasets (user_id, name, row_count, rows_json, updated_at) VALUES (?, ?, ?, ?, ?)')
+    .run(session.user.id, name, rows.length, rowsJson, now);
+
+  return c.json({ ok: true, name, rowCount: rows.length, updatedAt: now });
+});
+
+app.delete('/api/personal-datasets', async (c) => {
+  const session = await requireSession(c.req.raw);
+  if (!session) return c.json({ error: 'Unauthorized' }, 401);
+
+  personalDb.prepare('DELETE FROM user_datasets WHERE user_id = ?').run(session.user.id);
+  return c.json({ ok: true });
+});
+
+// 10. Production static asset serving (when dist/ exists)
 const distDir = path.resolve(process.cwd(), 'dist');
 if (fs.existsSync(distDir)) {
   app.use('/*', serveStatic({ root: './dist' }));

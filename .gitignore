@@ -3,9 +3,10 @@ node_modules/
 dist/
 *.local
 
-# Large simulated SQLite DB (>100MB GitHub limit) & local auth DB
+# Large simulated SQLite DB (>100MB GitHub limit) & local auth/personal DBs
 data/ssd_150mb_sim.db*
 data/auth.db*
+data/personal_datasets.db*
 *.db-wal
 *.db-shm
 
