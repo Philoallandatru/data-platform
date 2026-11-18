@@ -362,6 +362,7 @@ app.post('/api/insights', async (c) => {
 app.delete('/api/insights/:id', async (c) => {
   const session = await requireSession(c.req.raw);
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
+  if (session.user.role !== 'admin') return c.json({ error: 'Forbidden: Admin only' }, 403);
   deleteAIInsight(Number(c.req.param('id')));
   return c.json({ ok: true });
 });

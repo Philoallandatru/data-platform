@@ -39,86 +39,126 @@ async function ensureUser(adminCookie, name, email, password, role) {
   return created.user;
 }
 
-test('Multi-user isolation, RBAC, and semantic queries work without cross-user leakage', async () => {
+test('5-user concurrent workspace editing, custom panels, CSV uploads, insights, and RBAC isolation', async () => {
   const admin = await signIn('admin@pulselab.io', 'Admin@123456');
   assert.equal(admin.user.role, 'admin');
 
-  // Create two distinct team members via Admin API
-  await ensureUser(admin.cookie, 'Alice FW', 'alice@pulselab.io', 'Alice@123456', 'fw_team');
-  await ensureUser(admin.cookie, 'Bob QA', 'bob@pulselab.io', 'Bob@123456', 'qa_team');
-
-  const alice = await signIn('alice@pulselab.io', 'Alice@123456');
-  const bob = await signIn('bob@pulselab.io', 'Bob@123456');
-
-  assert.equal(alice.user.role, 'fw_team');
-  assert.equal(bob.user.role, 'qa_team');
-
-  // 1. Non-admins must be rejected on admin endpoints (403)
-  const aliceAdminCheck = await fetch(`${BASE}/api/admin/datasources`, {
-    headers: { Cookie: alice.cookie },
-  });
-  assert.equal(aliceAdminCheck.status, 403);
-
-  // 2. Alice saves her own multi-page workspace & personal CSV
-  const alicePages = [
-    {
-      id: 'alice-p1',
-      title: 'Alice 固件对比',
-      panels: [{ id: 'ap-1', title: 'Low-QD', widgets: ['radar'] }],
-    },
+  const specs = [
+    { name: 'Alice FW', email: 'alice@pulselab.io', pass: 'Alice@123456', role: 'fw_team', widgets: ['radar', 'personal_import'] },
+    { name: 'Bob QA', email: 'bob@pulselab.io', pass: 'Bob@123456', role: 'qa_team', widgets: ['heatmap', 'scatter'] },
+    { name: 'Charlie Dev', email: 'charlie@pulselab.io', pass: 'Charlie@123456', role: 'fw_team', widgets: ['rings', 'alerts'] },
+    { name: 'David PM', email: 'david@pulselab.io', pass: 'David@123456', role: 'viewer', widgets: ['semantic_raw', 'radar'] },
+    { name: 'Eve Ops', email: 'eve@pulselab.io', pass: 'Eve@123456', role: 'qa_team', widgets: ['scatter', 'personal_import'] },
   ];
-  await fetch(`${BASE}/api/workspace`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Cookie: alice.cookie },
-    body: JSON.stringify({ scope: 'myspace', pages: alicePages }),
-  });
-  await fetch(`${BASE}/api/personal-datasets`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Cookie: alice.cookie },
-    body: JSON.stringify({ name: 'alice_data.csv', rows: [{ job: 'alice_4k', bw: 410 }] }),
-  });
 
-  // 3. Bob saves his own distinct workspace & personal CSV
-  const bobPages = [
-    {
-      id: 'bob-p1',
-      title: 'Bob 高温压测',
-      panels: [{ id: 'bp-1', title: 'Thermal', widgets: ['heatmap'] }],
-    },
-  ];
-  await fetch(`${BASE}/api/workspace`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Cookie: bob.cookie },
-    body: JSON.stringify({ scope: 'myspace', pages: bobPages }),
-  });
-  await fetch(`${BASE}/api/personal-datasets`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Cookie: bob.cookie },
-    body: JSON.stringify({ name: 'bob_thermal.csv', rows: [{ job: 'bob_75c', bw: 7500 }] }),
-  });
+  // 1. Register all 5 users
+  for (const s of specs) {
+    await ensureUser(admin.cookie, s.name, s.email, s.pass, s.role);
+  }
 
-  // 4. Verify Alice and Bob each read back ONLY their own workspace and dataset
-  const aliceWs = await (await fetch(`${BASE}/api/workspace?scope=myspace`, { headers: { Cookie: alice.cookie } })).json();
-  const bobWs = await (await fetch(`${BASE}/api/workspace?scope=myspace`, { headers: { Cookie: bob.cookie } })).json();
-  assert.equal(aliceWs.pages[0].title, 'Alice 固件对比');
-  assert.equal(bobWs.pages[0].title, 'Bob 高温压测');
+  // 2. Sign in all 5 users in parallel
+  const sessions = await Promise.all(specs.map((s) => signIn(s.email, s.pass)));
 
-  const aliceDs = await (await fetch(`${BASE}/api/personal-datasets`, { headers: { Cookie: alice.cookie } })).json();
-  const bobDs = await (await fetch(`${BASE}/api/personal-datasets`, { headers: { Cookie: bob.cookie } })).json();
-  assert.equal(aliceDs.dataset.name, 'alice_data.csv');
-  assert.equal(bobDs.dataset.name, 'bob_thermal.csv');
+  // 3. Each user concurrently creates multi-page + multi-panel workspaces, uploads unique CSVs, and queries semantic API
+  await Promise.all(
+    sessions.map(async (sess, idx) => {
+      const spec = specs[idx];
 
-  // 5. Verify Semantic Query works for both users
-  const semRes = await fetch(`${BASE}/api/semantic/query`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Cookie: bob.cookie },
-    body: JSON.stringify({
-      dataset: 'ssd_runs',
-      metrics: ['avg_bandwidth', 'efficiency'],
-      groupBy: ['firmware'],
-    }),
-  });
-  assert.equal(semRes.status, 200);
-  const semJson = await semRes.json();
-  assert.ok(semJson.rows.length > 0);
+      // Non-admin RBAC check
+      const adm = await fetch(`${BASE}/api/admin/datasources`, { headers: { Cookie: sess.cookie } });
+      assert.equal(adm.status, 403, `${spec.email} must not access admin datasources`);
+
+      // Save 2 Pages x 2 Panels in My Space
+      const myPages = [
+        {
+          id: `${spec.name.split(' ')[0].toLowerCase()}-p1`,
+          title: `${spec.name} 主看板`,
+          panels: [
+            { id: 'pn-1', title: 'Panel A', widgets: spec.widgets },
+            { id: 'pn-2', title: 'Panel B', widgets: ['alerts'] },
+          ],
+        },
+        {
+          id: `${spec.name.split(' ')[0].toLowerCase()}-p2`,
+          title: `${spec.name} 实验页`,
+          panels: [{ id: 'pn-3', title: 'CSV 实验', widgets: ['personal_import'] }],
+        },
+      ];
+      const wsRes = await fetch(`${BASE}/api/workspace`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Cookie: sess.cookie },
+        body: JSON.stringify({ scope: 'myspace', pages: myPages }),
+      });
+      assert.equal(wsRes.status, 200);
+
+      // Save custom page panel tabs
+      const customScope = spec.role === 'fw_team' ? 'custom-fw' : 'custom-qa';
+      const customRes = await fetch(`${BASE}/api/workspace`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Cookie: sess.cookie },
+        body: JSON.stringify({
+          scope: customScope,
+          pages: [
+            {
+              id: 'page-1',
+              title: customScope,
+              panels: [
+                { id: 'cp-1', title: `${spec.name} 子页 1`, widgets: ['placeholder'] },
+                { id: 'cp-2', title: `${spec.name} 子页 2`, widgets: ['placeholder'] },
+              ],
+            },
+          ],
+        }),
+      });
+      assert.equal(customRes.status, 200);
+
+      // Upload unique CSV-like dataset
+      const dsRes = await fetch(`${BASE}/api/personal-datasets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: sess.cookie },
+        body: JSON.stringify({
+          name: `${spec.email.split('@')[0]}_dataset.csv`,
+          rows: [
+            { owner: spec.email, metric: 100 + idx * 50, temp: 55 + idx },
+            { owner: spec.email, metric: 200 + idx * 50, temp: 60 + idx },
+          ],
+        }),
+      });
+      assert.equal(dsRes.status, 200);
+
+      // Run semantic query
+      const semRes = await fetch(`${BASE}/api/semantic/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: sess.cookie },
+        body: JSON.stringify({
+          dataset: 'ssd_runs',
+          metrics: ['avg_bandwidth', 'efficiency'],
+          groupBy: ['firmware'],
+        }),
+      });
+      assert.equal(semRes.status, 200);
+      const semJson = await semRes.json();
+      assert.ok(semJson.rows.length > 0);
+    })
+  );
+
+  // 4. Read back all 5 users' isolated state and verify ZERO cross-user contamination
+  await Promise.all(
+    sessions.map(async (sess, idx) => {
+      const spec = specs[idx];
+      const ws = await (
+        await fetch(`${BASE}/api/workspace?scope=myspace`, { headers: { Cookie: sess.cookie } })
+      ).json();
+      assert.equal(ws.pages.length, 2);
+      assert.equal(ws.pages[0].title, `${spec.name} 主看板`);
+      assert.equal(ws.pages[1].title, `${spec.name} 实验页`);
+
+      const ds = await (
+        await fetch(`${BASE}/api/personal-datasets`, { headers: { Cookie: sess.cookie } })
+      ).json();
+      assert.equal(ds.dataset.name, `${spec.email.split('@')[0]}_dataset.csv`);
+      assert.equal(ds.dataset.rows[0].owner, spec.email);
+      assert.equal(ds.dataset.rows[0].metric, 100 + idx * 50);
+    })
+  );
 });

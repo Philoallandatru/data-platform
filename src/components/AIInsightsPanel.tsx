@@ -40,10 +40,19 @@ function renderMarkdownBlock(md: string): React.ReactNode {
       {lines.map((line, idx) => {
         const trimmed = line.trim();
         if (!trimmed) return <div key={idx} className="h-1" />;
-        if (trimmed.startsWith('### ')) {
+        if (/^#{1,3}\s+/.test(trimmed)) {
           return (
             <div key={idx} className="font-display font-bold text-xs text-[var(--text-primary)] pt-1">
-              {renderInlineMarkdown(trimmed.slice(4))}
+              {renderInlineMarkdown(trimmed.replace(/^#{1,3}\s+/, ''))}
+            </div>
+          );
+        }
+        if (/^(\d+\.)\s+/.test(trimmed)) {
+          const match = trimmed.match(/^(\d+\.)\s+(.*)$/);
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1">
+              <span className="font-mono-num text-[#00B4D8] font-semibold">{match?.[1]}</span>
+              <span>{renderInlineMarkdown(match?.[2] || '')}</span>
             </div>
           );
         }

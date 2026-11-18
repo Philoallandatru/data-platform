@@ -15,6 +15,7 @@ const BobSpace: React.FC = () => {
     dataset: 'raw_io_traces',
     metrics: ['trace_count', 'avg_latency_us', 'avg_power_mw', 'max_temp_c'],
     groupBy: ['firmware'],
+    where: { model: 'x900-2tb' },
     orderBy: { field: 'avg_latency_us', dir: 'asc' },
   });
 

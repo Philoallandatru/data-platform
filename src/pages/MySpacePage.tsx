@@ -203,7 +203,8 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
       .then((res) => {
         if (res?.dataset) {
           setImportedName(res.dataset.name);
-          setImportedRows(Array.isArray(res.dataset.rows) ? res.dataset.rows : []);
+          const loaded = Array.isArray(res.dataset.rows) ? res.dataset.rows : [];
+          setImportedRows(loaded.map((r: any, idx: number) => ({ __rowId: r.__rowId ?? idx + 1, ...r })));
         }
       })
       .catch(() => {});

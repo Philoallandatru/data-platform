@@ -145,9 +145,20 @@ export function App() {
         setData(payload);
         setError(null);
         if (isInitial) {
-          if (payload.models.length > 0) setSelectedModelId(payload.models[0].id);
-          if (payload.firmwares.length > 0) setSelectedFirmwareId(payload.firmwares[payload.firmwares.length - 1].id);
-          if (payload.testItems.length > 0) setSelectedTestId(payload.testItems[0].id);
+          const route = parseUrlPath(window.location.pathname);
+          if (!route.modelId && payload.models.length > 0) {
+            setSelectedModelId(payload.models[0].id);
+          }
+          if (payload.firmwares.length > 0) {
+            setSelectedFirmwareId(payload.firmwares[payload.firmwares.length - 1].id);
+          }
+          if (route.module === 'performance' || route.module === 'power') {
+            const suiteList = route.module === 'performance' ? PERFORMANCE_SUITES : POWER_SUITES;
+            const matched = suiteList.find((s) => s.id === route.subPageId);
+            if (matched) setSelectedTestId(matched.defaultTestId);
+          } else if (payload.testItems.length > 0) {
+            setSelectedTestId(payload.testItems[0].id);
+          }
         }
       })
       .catch((err) => setError(err?.message || 'Failed to load SQLite telemetry'));
@@ -382,7 +393,8 @@ export function App() {
                 {activeModule !== 'home' &&
                   activeModule !== 'showcase' &&
                   activeModule !== 'admin' &&
-                  activeModule !== 'myspace' && (
+                  activeModule !== 'myspace' &&
+                  activeModule !== 'spaces' && (
                     <>
                       <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
                       <span className="text-[#FF6B2C] font-medium">
@@ -390,6 +402,12 @@ export function App() {
                       </span>
                     </>
                   )}
+                {activeModule === 'spaces' && activeSubPageId !== 'directory' && (
+                  <>
+                    <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
+                    <span className="text-[#A855F7] font-medium">{activeSubPageId}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -510,6 +528,10 @@ export function App() {
                     ? 'myspace'
                     : activeModule === 'showcase'
                     ? 'global'
+                    : activeModule === 'spaces'
+                    ? activeSubPageId === 'directory'
+                      ? 'global'
+                      : activeSubPageId
                     : activeModule === 'custom'
                     ? activeCustomPage.id
                     : activeSuiteConfig.id
