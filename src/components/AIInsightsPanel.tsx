@@ -8,6 +8,59 @@ interface AIInsightsPanelProps {
   onDeleted?: () => void;
 }
 
+/** Safe, zero-dependency React inline Markdown renderer (`code`, **bold**) */
+function renderInlineMarkdown(text: string): React.ReactNode[] {
+  const tokens = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
+  return tokens.map((tok, i) => {
+    if (tok.startsWith('`') && tok.endsWith('`') && tok.length >= 2) {
+      return (
+        <code
+          key={i}
+          className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--bg-input)] border border-[var(--border-card)] font-mono-num text-[11px] text-[#FF6B2C]"
+        >
+          {tok.slice(1, -1)}
+        </code>
+      );
+    }
+    if (tok.startsWith('**') && tok.endsWith('**') && tok.length >= 4) {
+      return (
+        <strong key={i} className="font-semibold text-[var(--text-primary)]">
+          {tok.slice(2, -2)}
+        </strong>
+      );
+    }
+    return <React.Fragment key={i}>{tok}</React.Fragment>;
+  });
+}
+
+function renderMarkdownBlock(md: string): React.ReactNode {
+  const lines = md.split(/\r?\n/);
+  return (
+    <div className="space-y-1.5 text-xs text-[var(--text-secondary)] leading-relaxed">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={idx} className="h-1" />;
+        if (trimmed.startsWith('### ')) {
+          return (
+            <div key={idx} className="font-display font-bold text-xs text-[var(--text-primary)] pt-1">
+              {renderInlineMarkdown(trimmed.slice(4))}
+            </div>
+          );
+        }
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-1">
+              <span className="text-[#00B4D8] mt-0.5">•</span>
+              <span>{renderInlineMarkdown(trimmed.slice(2))}</span>
+            </div>
+          );
+        }
+        return <p key={idx}>{renderInlineMarkdown(line)}</p>;
+      })}
+    </div>
+  );
+}
+
 export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
   insights,
   scope,
@@ -99,9 +152,7 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
                     {item.title}
                   </h4>
 
-                  <p className="text-xs text-[var(--text-secondary)] leading-relaxed whitespace-pre-line">
-                    {item.summary_md}
-                  </p>
+                  {renderMarkdownBlock(item.summary_md)}
                 </div>
 
                 <div className="pt-2.5 border-t border-[var(--border-card)] flex flex-wrap items-center justify-between gap-2">
