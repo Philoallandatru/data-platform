@@ -108,7 +108,7 @@ export const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
           当前页面暂无 AI 分析结论。在终端让 OpenCode / 千问调用 MCP <code className="text-[#00B4D8]">publish_ai_insight</code> 或运行 <code className="text-[#FF6B2C]">npm run ai:cli -- publish --scope {scope}</code> 即可 5 秒内自动上墙。
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <div className={`grid grid-cols-1 ${filtered.length >= 2 ? 'md:grid-cols-2' : ''} gap-3.5`}>
           {filtered.map((item) => {
             const sevStyle =
               item.severity === 'critical'

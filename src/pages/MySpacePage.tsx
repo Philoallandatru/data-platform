@@ -540,6 +540,37 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
         </div>
       )}
 
+      {/* Active Page / Panel Indicator + Empty State Guide */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs font-mono-num text-[var(--text-secondary)]">
+        <span>
+          当前视图：<strong className="text-[#FF6B2C]">{activePage.title}</strong> /{' '}
+          <strong className="text-[#00B4D8]">{activePanel.title}</strong>（已挂载 {widgets.length} 个组件）
+        </span>
+        <button
+          onClick={() => setShowPicker(true)}
+          className="text-[11px] text-[#00B4D8] hover:underline cursor-pointer"
+        >
+          + 为当前 Panel 增减组件
+        </button>
+      </div>
+
+      {widgets.length === 0 && (
+        <div className="bento-card rounded-2xl p-8 text-center space-y-3 border-2 border-dashed border-[var(--border-subtle)]">
+          <div className="text-sm font-semibold text-[var(--text-primary)]">
+            「{activePage.title} / {activePanel.title}」当前是一个空白 Panel
+          </div>
+          <p className="text-xs text-[var(--text-secondary)]">
+            每个新建的页面和 Panel 都是独立的画布配置（已保存至 auth.db）。点击下方按钮即可为它挑选要展示的图表或数据导入区。
+          </p>
+          <button
+            onClick={() => setShowPicker(true)}
+            className="px-4 py-2 rounded-xl bg-[#FF6B2C] text-white text-xs font-semibold cursor-pointer"
+          >
+            + 立即配置本 Panel 组件
+          </button>
+        </div>
+      )}
+
       {/* Personal CSV / JSON Dropzone & Auto-Visualizer (when enabled on active panel) */}
       {widgets.includes('personal_import') && (
       <div className="bento-card rounded-2xl p-5 space-y-4">
