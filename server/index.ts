@@ -4,7 +4,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { auth, initAuthDatabase } from './auth';
+import { auth, authDb, initAuthDatabase } from './auth';
 import {
   executeSemanticQuery,
   getPoolDb,
@@ -143,7 +143,48 @@ app.post('/api/admin/datasources', async (c) => {
   return c.json({ datasources: setActiveDataSources(activeIds) });
 });
 
-// 8. Production static asset serving (when dist/ exists)
+// 8. Personal Workspace Layout Persistence (per authenticated user in auth.db)
+const DEFAULT_WIDGETS = ['radar', 'scatter', 'semantic_raw'];
+
+app.get('/api/workspace', async (c) => {
+  const session = await requireSession(c.req.raw);
+  if (!session) return c.json({ error: 'Unauthorized' }, 401);
+
+  const row = authDb
+    .prepare('SELECT widgets_json, updated_at FROM user_workspaces WHERE user_id = ?')
+    .get(session.user.id) as { widgets_json: string; updated_at: number } | undefined;
+
+  let widgets = DEFAULT_WIDGETS;
+  if (row?.widgets_json) {
+    try {
+      const parsed = JSON.parse(row.widgets_json);
+      if (Array.isArray(parsed)) widgets = parsed;
+    } catch {
+      widgets = DEFAULT_WIDGETS;
+    }
+  }
+  return c.json({ widgets, updatedAt: row?.updated_at ?? null });
+});
+
+app.put('/api/workspace', async (c) => {
+  const session = await requireSession(c.req.raw);
+  if (!session) return c.json({ error: 'Unauthorized' }, 401);
+
+  const body = await c.req.json();
+  const widgets = Array.isArray(body?.widgets) ? body.widgets.slice(0, 20) : DEFAULT_WIDGETS;
+  const now = Date.now();
+  authDb
+    .prepare(
+      `INSERT INTO user_workspaces (user_id, widgets_json, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET widgets_json = excluded.widgets_json, updated_at = excluded.updated_at`
+    )
+    .run(session.user.id, JSON.stringify(widgets), now);
+
+  return c.json({ ok: true, widgets, updatedAt: now });
+});
+
+// 9. Production static asset serving (when dist/ exists)
 const distDir = path.resolve(process.cwd(), 'dist');
 if (fs.existsSync(distDir)) {
   app.use('/*', serveStatic({ root: './dist' }));

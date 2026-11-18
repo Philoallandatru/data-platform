@@ -17,6 +17,7 @@ import {
   PanelLeftOpen,
   Plus,
   Shield,
+  User,
   Zap,
 } from 'lucide-react';
 
@@ -235,8 +236,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* 4. All-in-One Visualization Showcase & Admin Console */}
+        {/* 4. Personal Space, Visualization Showcase & Admin Console */}
         <div className="pt-2 border-t border-[var(--border-card)] space-y-2">
+          <button
+            onClick={() => onNavigate('myspace', 'personal')}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer border ${
+              activeModule === 'myspace'
+                ? 'bg-[#00B4D8]/15 border-[#00B4D8]/50 text-[#00B4D8]'
+                : 'bg-[var(--bg-subtle)] border-[var(--border-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <User className="w-4 h-4 text-[#00B4D8] shrink-0" />
+            {!collapsed && <span>我的空间 (My Space)</span>}
+          </button>
+
           <button
             onClick={() => onNavigate('showcase', 'gallery')}
             className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer border ${

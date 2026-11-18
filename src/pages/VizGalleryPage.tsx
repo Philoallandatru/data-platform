@@ -17,6 +17,7 @@ import {
   WorkloadMatrixCard,
 } from '../components/SSDBentoWidgets';
 import { BenchmarkDataTable } from '../components/BenchmarkDataTable';
+import { LazyVisibleCard } from '../components/LazyVisibleCard';
 import {
   EfficiencyScatterPlot,
   FirmwareRadarChart,
@@ -136,59 +137,73 @@ export const VizGalleryPage: React.FC<VizGalleryPageProps> = ({
         </div>
       </div>
 
-      {/* Row 3: 6x10 Heatmap Matrix + Treemap + Grouped Bars */}
+      {/* Row 3: 6x10 Heatmap Matrix + Treemap + Grouped Bars (Lazy Mounted) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         <div className="lg:col-span-6">
-          <ThermalHeatmapMatrix
-            runs={runsForModel}
-            firmwares={firmwares}
-            testItems={testItems}
-            onSelectCell={onJump}
-          />
+          <LazyVisibleCard>
+            <ThermalHeatmapMatrix
+              runs={runsForModel}
+              firmwares={firmwares}
+              testItems={testItems}
+              onSelectCell={onJump}
+            />
+          </LazyVisibleCard>
         </div>
         <div className="lg:col-span-3">
-          <WorkloadShareTreemap
-            runsForFirmware={runsForFirmware}
-            testItems={testItems}
-            onSelectTest={onSelectTest}
-          />
+          <LazyVisibleCard>
+            <WorkloadShareTreemap
+              runsForFirmware={runsForFirmware}
+              testItems={testItems}
+              onSelectTest={onSelectTest}
+            />
+          </LazyVisibleCard>
         </div>
         <div className="lg:col-span-3">
-          <GroupedComparisonBars runs={runsForModel} firmwares={firmwares} />
+          <LazyVisibleCard>
+            <GroupedComparisonBars runs={runsForModel} firmwares={firmwares} />
+          </LazyVisibleCard>
         </div>
       </div>
 
       {/* Row 4: Pareto Bars + Full Matrix Table + Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         <div className="lg:col-span-4">
-          <FirmwareParetoCard
-            firmwares={firmwares}
-            runsForTest={runsForTest}
-            selectedFirmwareId={firmware.id}
-            onSelectFirmware={onSelectFirmware}
-            testName={currentTest?.name || selectedTestId}
-          />
+          <LazyVisibleCard>
+            <FirmwareParetoCard
+              firmwares={firmwares}
+              runsForTest={runsForTest}
+              selectedFirmwareId={firmware.id}
+              onSelectFirmware={onSelectFirmware}
+              testName={currentTest?.name || selectedTestId}
+            />
+          </LazyVisibleCard>
         </div>
         <div className="lg:col-span-8">
-          <WorkloadMatrixCard
-            testItems={testItems}
-            runsForFirmware={runsForFirmware}
-            selectedTestId={selectedTestId}
-            onSelectTest={onSelectTest}
-          />
+          <LazyVisibleCard>
+            <WorkloadMatrixCard
+              testItems={testItems}
+              runsForFirmware={runsForFirmware}
+              selectedTestId={selectedTestId}
+              onSelectTest={onSelectTest}
+            />
+          </LazyVisibleCard>
         </div>
       </div>
 
-      <RegressionAlertsCard alerts={alerts} onJumpToAlert={onJump} />
+      <LazyVisibleCard>
+        <RegressionAlertsCard alerts={alerts} onJumpToAlert={onJump} />
+      </LazyVisibleCard>
 
-      <BenchmarkDataTable
-        runs={allRuns}
-        models={models}
-        firmwares={firmwares}
-        testItems={testItems}
-        selectedModelId={model.id}
-        onSelectRun={onJump}
-      />
+      <LazyVisibleCard>
+        <BenchmarkDataTable
+          runs={allRuns}
+          models={models}
+          firmwares={firmwares}
+          testItems={testItems}
+          selectedModelId={model.id}
+          onSelectRun={onJump}
+        />
+      </LazyVisibleCard>
 
       {/* Extensible Template Slots */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

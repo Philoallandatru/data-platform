@@ -27,6 +27,9 @@ const CustomBlankPage = lazy(() =>
 const AdminPage = lazy(() =>
   import('./pages/AdminPage').then((m) => ({ default: m.AdminPage }))
 );
+const MySpacePage = lazy(() =>
+  import('./pages/MySpacePage').then((m) => ({ default: m.MySpacePage }))
+);
 import {
   Activity,
   ChevronRight,
@@ -280,11 +283,13 @@ export function App() {
                     ? 'Viz Gallery'
                     : activeModule === 'custom'
                     ? 'Custom'
+                    : activeModule === 'myspace'
+                    ? 'My Space'
                     : activeModule === 'admin'
                     ? 'Admin'
                     : activeModule}
                 </span>
-                {activeModule !== 'showcase' && activeModule !== 'admin' && (
+                {activeModule !== 'showcase' && activeModule !== 'admin' && activeModule !== 'myspace' && (
                   <>
                     <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
                     <span className="text-[#FF6B2C] font-medium">
@@ -478,6 +483,23 @@ export function App() {
                 page={activeCustomPage}
                 modelName={currentModel.name}
                 firmwareVersion={currentFirmware.version}
+              />
+            )}
+
+            {activeModule === 'myspace' && (
+              <MySpacePage
+                userId={session.user.id}
+                userName={session.user.name}
+                userRole={userRole}
+                model={currentModel}
+                firmware={currentFirmware}
+                firmwares={data.firmwares}
+                testItems={data.testItems}
+                runsForModel={runsForModel}
+                runsForTest={runsForTest}
+                activeRun={activeRun}
+                alerts={data.alerts}
+                onJump={handleJump}
               />
             )}
 

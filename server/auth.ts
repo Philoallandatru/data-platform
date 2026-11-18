@@ -40,6 +40,14 @@ export async function initAuthDatabase() {
     await runMigrations();
   }
 
+  authDb.exec(`
+    CREATE TABLE IF NOT EXISTS user_workspaces (
+      user_id TEXT PRIMARY KEY,
+      widgets_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+
   const countRow = authDb.prepare('SELECT COUNT(*) as c FROM user').get() as { c: number };
   if ((countRow?.c ?? 0) === 0) {
     // Seed default Admin account
