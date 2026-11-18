@@ -49,7 +49,22 @@ export async function initAuthDatabase() {
   `);
 
   const countRow = authDb.prepare('SELECT COUNT(*) as c FROM user').get() as { c: number };
-  if ((countRow?.c ?? 0) === 0 && process.env.NODE_ENV !== 'production') {
+  if ((countRow?.c ?? 0) === 0) {
+    if (process.env.NODE_ENV === 'production') {
+      const adminEmail = process.env.ADMIN_EMAIL;
+      const adminPassword = process.env.ADMIN_PASSWORD;
+      if (adminEmail && adminPassword) {
+        await auth.api.signUpEmail({
+          body: { name: 'System Admin', email: adminEmail, password: adminPassword },
+        });
+        authDb.prepare("UPDATE user SET role = 'admin' WHERE email = ?").run(adminEmail);
+        console.log(`[Auth] Bootstrapped production admin: ${adminEmail}`);
+      } else {
+        console.warn('[Auth] No users in auth.db. Set ADMIN_EMAIL & ADMIN_PASSWORD to bootstrap the first admin.');
+      }
+      return;
+    }
+
     // Seed default dev accounts only outside production
     await auth.api.signUpEmail({
       body: {
