@@ -303,6 +303,14 @@ export function App() {
 
   const userRole = (session.user as any).role || 'viewer';
 
+  const handleSignOut = async () => {
+    await signOut();
+    window.history.replaceState(null, '', '/');
+    setActiveModule('home');
+    setActiveSubPageId('overview');
+    setMobileMenuOpen(false);
+  };
+
   if (error) {
     return (
       <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex items-center justify-center p-6">
@@ -447,8 +455,8 @@ export function App() {
             />
 
             {/* User Badge & Sign Out */}
-            <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-[var(--border-card)]">
-              <div className="text-right">
+            <div className="flex items-center gap-2 pl-2 border-l border-[var(--border-card)]">
+              <div className="hidden md:block text-right">
                 <div className="text-xs font-semibold text-[var(--text-primary)] leading-tight">
                   {session.user.name}
                 </div>
@@ -457,8 +465,9 @@ export function App() {
                 </div>
               </div>
               <button
-                onClick={() => signOut()}
+                onClick={handleSignOut}
                 title="Sign Out"
+                aria-label="Sign Out"
                 className="p-2 rounded-xl bg-[var(--bg-input)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[#FF4D2E] transition cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -487,6 +496,8 @@ export function App() {
             activeSubPageId={activeSubPageId}
             onNavigate={handleNavigate}
             userRole={userRole}
+            userName={session.user.name}
+            onSignOut={handleSignOut}
           />
         </div>
 
@@ -500,6 +511,8 @@ export function App() {
                 activeSubPageId={activeSubPageId}
                 onNavigate={handleNavigate}
                 userRole={userRole}
+                userName={session.user.name}
+                onSignOut={handleSignOut}
               />
             </div>
             <div

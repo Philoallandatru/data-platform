@@ -13,6 +13,7 @@ import {
   HardDrive,
   Home,
   LayoutGrid,
+  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Shield,
@@ -33,6 +34,8 @@ interface SidebarProps {
     defaultTestId?: string
   ) => void;
   userRole?: string;
+  userName?: string;
+  onSignOut?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -42,6 +45,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeSubPageId,
   onNavigate,
   userRole = 'viewer',
+  userName,
+  onSignOut,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedModels, setExpandedModels] = useState<Record<string, boolean>>(() => ({
@@ -334,13 +339,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {!collapsed && (
-        <div className="p-3.5 border-t border-[var(--border-card)]">
+        <div className="p-3.5 border-t border-[var(--border-card)] space-y-2">
           <div className="rounded-xl border border-dashed border-[var(--border-subtle)] p-2.5 text-[11px] text-[var(--text-muted)] flex items-center gap-2">
             <HardDrive className="w-3.5 h-3.5 text-[#00B4D8] shrink-0" />
             <span className="font-mono-num truncate">
               Active: {models.find((m) => m.id === selectedModelId)?.name}
             </span>
           </div>
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-[var(--bg-subtle)] hover:bg-[#FF4D2E]/10 border border-[var(--border-card)] hover:border-[#FF4D2E]/40 text-[11px] text-[var(--text-secondary)] hover:text-[#FF4D2E] transition cursor-pointer"
+            >
+              <span className="truncate font-medium">
+                {userName ? `${userName} (${userRole})` : 'Sign Out'}
+              </span>
+              <span className="inline-flex items-center gap-1 font-semibold shrink-0">
+                <LogOut className="w-3 h-3" />
+                退出
+              </span>
+            </button>
+          )}
         </div>
       )}
     </aside>

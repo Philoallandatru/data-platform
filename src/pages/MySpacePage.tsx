@@ -159,6 +159,7 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
   const [activePageId, setActivePageId] = useState<string>('page-1');
   const [activePanelId, setActivePanelId] = useState<string>('panel-1');
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
+  const [hasRawTracesDs, setHasRawTracesDs] = useState(false);
   const [savingLayout, setSavingLayout] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
@@ -189,14 +190,43 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
       .then((res) => {
         if (Array.isArray(res?.pages) && res.pages.length > 0) {
           setPages(res.pages);
-          setActivePageId(res.pages[0].id);
-          setActivePanelId(res.pages[0].panels[0]?.id || 'panel-1');
+          let nextPageId = res.pages[0].id;
+          let nextPanelId = res.pages[0].panels[0]?.id || 'panel-1';
+          try {
+            const savedNav = JSON.parse(
+              localStorage.getItem(`pulselab:myspace:nav:${userId}`) || 'null'
+            );
+            const matchedPage = res.pages.find((p: WorkspacePage) => p.id === savedNav?.pageId);
+            if (matchedPage) {
+              nextPageId = matchedPage.id;
+              const matchedPanel = matchedPage.panels.find(
+                (pn: WorkspacePanel) => pn.id === savedNav?.panelId
+              );
+              if (matchedPanel) {
+                nextPanelId = matchedPanel.id;
+              } else if (matchedPage.panels[0]?.id) {
+                nextPanelId = matchedPage.panels[0].id;
+              }
+            }
+          } catch {
+            // ignore invalid localStorage entry
+          }
+          setActivePageId(nextPageId);
+          setActivePanelId(nextPanelId);
         }
       })
       .catch(() => {})
       .finally(() => {
         if (!controller.signal.aborted) setWorkspaceLoaded(true);
       });
+
+    fetch('/api/semantic/catalog', { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const active = Array.isArray(res?.activeDatasources) ? res.activeDatasources : [];
+        setHasRawTracesDs(active.some((d: any) => d.id === 'ssd_150mb_sim'));
+      })
+      .catch(() => setHasRawTracesDs(false));
 
     fetch('/api/personal-datasets', { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
@@ -314,9 +344,22 @@ export const MySpacePage: React.FC<MySpacePageProps> = ({
     }
   };
 
-  // Live 1.35M-row Semantic Query for personal widget (scoped to selected model & gated on workspace load)
+  // Persist active page/panel selection across reloads
+  useEffect(() => {
+    if (!workspaceLoaded) return;
+    try {
+      localStorage.setItem(
+        `pulselab:myspace:nav:${userId}`,
+        JSON.stringify({ pageId: activePageId, panelId: activePanelId })
+      );
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [userId, workspaceLoaded, activePageId, activePanelId]);
+
+  // Live 1.35M-row Semantic Query for personal widget (only when ssd_150mb_sim is active)
   const { data: semRaw } = useSemanticQuery(
-    workspaceLoaded && widgets.includes('semantic_raw')
+    workspaceLoaded && hasRawTracesDs && widgets.includes('semantic_raw')
       ? {
           dataset: 'raw_io_traces',
           metrics: ['trace_count', 'avg_latency_us', 'avg_power_mw'],

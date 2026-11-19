@@ -158,7 +158,7 @@ export const AdminPage: React.FC = () => {
         header: 'Role & Access',
         accessor: (u) => u.role,
         render: (u) => (
-          <div onClick={(e) => e.stopPropagation()} className="w-40">
+          <div onClick={(e) => e.stopPropagation()} className="min-w-48">
             <CustomSelect
               value={u.role}
               options={ROLE_OPTIONS}
