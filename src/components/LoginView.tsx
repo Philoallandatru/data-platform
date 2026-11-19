@@ -23,7 +23,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const res = await signIn.email({ email, password });
+    const res = await signIn.email({ email, password, rememberMe: true });
     setLoading(false);
     if (res.error) {
       setError(res.error.message || 'Invalid email or password');

@@ -26,6 +26,10 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: false,
   },
+  session: {
+    expiresIn: 60 * 60 * 24 * 30, // 30 days
+    updateAge: 60 * 60 * 24, // refresh daily on activity
+  },
   plugins: [
     admin({
       defaultRole: 'viewer',
