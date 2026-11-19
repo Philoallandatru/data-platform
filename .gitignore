@@ -1,6 +1,7 @@
 # Dependencies & Build
 node_modules/
 dist/
+release/
 *.local
 
 # Large simulated SQLite DB (>100MB GitHub limit) & local auth/personal DBs

@@ -12,6 +12,7 @@
     "verify": "tsc -b && npm run lint && npm run build",
     "test:multiuser": "node --test tests/e2e_multiuser.test.mjs",
     "build": "tsc -b && vite build",
+    "package:release": "node scripts/package_release.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
