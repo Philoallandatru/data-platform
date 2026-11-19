@@ -295,7 +295,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }`}
           >
             <User className="w-4 h-4 text-[#00B4D8] shrink-0" />
-            {!collapsed && <span>我的空间 (/myspace)</span>}
+            {!collapsed && <span>我的空间</span>}
           </button>
 
           <button
@@ -307,7 +307,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }`}
           >
             <Users className="w-4 h-4 text-[#A855F7] shrink-0" />
-            {!collapsed && <span>团队空间 (/spaces)</span>}
+            {!collapsed && <span>团队空间</span>}
           </button>
 
           <button
@@ -319,7 +319,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }`}
           >
             <LayoutGrid className="w-4 h-4 text-[#FF6B2C] shrink-0" />
-            {!collapsed && <span>可视化样板库 (/showcase)</span>}
+            {!collapsed && <span>可视化样板库</span>}
           </button>
 
           {userRole === 'admin' && (
@@ -332,7 +332,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               <Shield className="w-4 h-4 text-[#FF6B2C] shrink-0" />
-              {!collapsed && <span>系统管理 (/admin)</span>}
+              {!collapsed && <span>系统管理</span>}
             </button>
           )}
         </div>

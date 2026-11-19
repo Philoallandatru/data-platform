@@ -39,7 +39,7 @@ export const TeamSpacesPage: React.FC<TeamSpacesPageProps> = ({
             onClick={() => onSelectSpace('directory')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] hover:border-[#FF6B2C] transition cursor-pointer"
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> 返回团队空间目录 (/spaces)
+            <ArrowLeft className="w-3.5 h-3.5" /> 返回团队空间目录
           </button>
           <span className="text-xs font-mono-num text-[var(--text-muted)]">
             Author: {selectedSpace.author} ({selectedSpace.team}) • /spaces/{selectedSpace.id}
