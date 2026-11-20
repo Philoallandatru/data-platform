@@ -43,9 +43,17 @@ personalDb.exec(`
 // 1. Mount Better Auth handler (Sign-in, Sign-out, Session, Admin CRUD)
 app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw));
 
-// 2. Auth Guard helper
+// 2. Auth Guard & Safe JSON helpers
 async function requireSession(req: Request) {
   return auth.api.getSession({ headers: req.headers });
+}
+
+async function parseJsonBody(c: any): Promise<{ ok: true; data: any } | { ok: false; res: Response }> {
+  try {
+    return { ok: true, data: await c.req.json() };
+  } catch {
+    return { ok: false, res: c.json({ error: 'Invalid JSON body' }, 400) };
+  }
 }
 
 // 3. Lightweight SQLite version check (PRAGMA data_version) via shared pool
@@ -167,8 +175,9 @@ app.post('/api/admin/datasources', async (c) => {
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
   if (session.user.role !== 'admin') return c.json({ error: 'Forbidden: Admin only' }, 403);
 
-  const body = await c.req.json();
-  const activeIds = Array.isArray(body?.activeIds) ? body.activeIds : [];
+  const parsed = await parseJsonBody(c);
+  if (!parsed.ok) return parsed.res;
+  const activeIds = Array.isArray(parsed.data?.activeIds) ? parsed.data.activeIds : [];
   return c.json({ datasources: setActiveDataSources(activeIds) });
 });
 
@@ -246,7 +255,9 @@ app.put('/api/workspace', async (c) => {
   const session = await requireSession(c.req.raw);
   if (!session) return c.json({ error: 'Unauthorized' }, 401);
 
-  const body = await c.req.json();
+  const parsed = await parseJsonBody(c);
+  if (!parsed.ok) return parsed.res;
+  const body = parsed.data;
   const scope = String(body?.scope || 'myspace').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
   const key = scope === 'myspace' ? session.user.id : `${session.user.id}:${scope}`;
 

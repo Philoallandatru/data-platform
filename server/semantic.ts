@@ -68,7 +68,7 @@ export const SEMANTIC_DATASETS: Record<string, SemanticDatasetDef> = {
   },
 };
 
-const pool = new Map<string, DatabaseSync>();
+const pool = new Map<string, { db: DatabaseSync; mtimeMs: number }>();
 
 function loadActiveIds(): Set<string> {
   try {
@@ -132,10 +132,10 @@ export function setActiveDataSources(ids: string[]) {
   saveActiveIds(next);
 
   // Close deactivated connections
-  for (const [key, db] of pool.entries()) {
+  for (const [key, entry] of pool.entries()) {
     if (!next.has(key)) {
       try {
-        db.close();
+        entry.db.close();
       } catch {
         // ignore
       }
@@ -150,8 +150,6 @@ export function getPoolDb(datasourceId: string): DatabaseSync {
   if (!activeIds.has(datasourceId)) {
     throw new Error(`Datasource "${datasourceId}" is not active or does not exist`);
   }
-  const existing = pool.get(datasourceId);
-  if (existing) return existing;
 
   const safeName = path.basename(`${datasourceId}.db`);
   const fullPath = path.resolve(DATA_DIR, safeName);
@@ -159,9 +157,23 @@ export function getPoolDb(datasourceId: string): DatabaseSync {
     throw new Error(`Database file not found: ${safeName}`);
   }
 
+  const mtimeMs = fs.statSync(fullPath).mtimeMs;
+  const existing = pool.get(datasourceId);
+  if (existing && existing.mtimeMs === mtimeMs) {
+    return existing.db;
+  }
+  if (existing) {
+    try {
+      existing.db.close();
+    } catch {
+      // ignore
+    }
+    pool.delete(datasourceId);
+  }
+
   const db = new DatabaseSync(fullPath, { open: true, readOnly: true });
   db.exec('PRAGMA busy_timeout = 3000;');
-  pool.set(datasourceId, db);
+  pool.set(datasourceId, { db, mtimeMs });
   return db;
 }
 
@@ -231,7 +243,8 @@ export function executeSemanticQuery(input: SemanticQueryInput) {
     sql += ` ORDER BY "${input.orderBy.field}" ${dir}`;
   }
 
-  const limit = Math.min(200, Math.max(1, Number(input.limit || 50)));
+  const rawLimit = Number(input.limit ?? 50);
+  const limit = Number.isFinite(rawLimit) ? Math.min(200, Math.max(1, Math.trunc(rawLimit))) : 50;
   sql += ` LIMIT ${limit}`;
 
   const t0 = performance.now();

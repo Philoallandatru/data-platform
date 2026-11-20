@@ -10,6 +10,8 @@
     "ai:cli": "tsx scripts/ai_cli.ts",
     "lint": "eslint .",
     "verify": "tsc -b && npm run lint && npm run build",
+    "test:unit": "node --test tests/semantic_security.test.mjs",
+    "test:rbac": "node --test tests/rbac_and_limits.test.mjs",
     "test:multiuser": "node --test tests/e2e_multiuser.test.mjs",
     "build": "tsc -b && vite build",
     "package:release": "node scripts/package_release.mjs",

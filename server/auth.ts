@@ -17,11 +17,20 @@ if (process.env.NODE_ENV === 'production' && !authSecret) {
   throw new Error('[Auth] BETTER_AUTH_SECRET must be set in production');
 }
 
+const baseURL = process.env.BETTER_AUTH_URL || 'http://localhost:5180';
+const extraOrigins = (process.env.TRUSTED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const trustedOrigins = Array.from(
+  new Set(['http://localhost:5180', 'http://localhost:3001', baseURL, ...extraOrigins])
+);
+
 export const auth = betterAuth({
   database: authDb,
-  baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:5180',
+  baseURL,
   secret: authSecret || 'pulse-lab-dev-secret-change-in-production-2026',
-  trustedOrigins: ['http://localhost:5180', 'http://localhost:3001'],
+  trustedOrigins,
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,

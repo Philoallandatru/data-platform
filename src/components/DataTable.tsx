@@ -562,7 +562,7 @@ export function DataTable<T>({
               setPage(1);
             }}
             align="left"
-            className="w-28"
+            className="min-w-32"
             options={[10, 25, 50, 100].map((sz) => ({
               value: String(sz),
               label: `${sz} / page`,
